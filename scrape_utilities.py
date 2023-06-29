@@ -1,6 +1,9 @@
 from bs4 import BeautifulSoup
+import requests
+import re
 
 def get_float_sector_info(ticker):
+    print('hello')
     floatchecker_url = 'https://www.floatchecker.com/stock?float='
     floatchecker_url = floatchecker_url + ticker
     html = requests.get(floatchecker_url).text
@@ -59,3 +62,74 @@ def get_float_sector_info(ticker):
         info_dict['short interest'] = 'N/A'
 
     return info_dict
+
+info_dict = get_float_sector_info('AAPL')
+print(info_dict['float'])
+
+import requests
+from bs4 import BeautifulSoup
+
+
+def get_stock_float(ticker):
+    url = f"https://www.morningstar.com/stocks/{ticker}/quote"
+
+    # Send an HTTP GET request
+    response = requests.get(url)
+
+    print(response.status_code)
+    if response.status_code == 200:
+        # Parse the HTML content
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # Find the element containing the stock's float
+        float_element = soup.find("div", class_="mdc-float-sheet__stats__item mdc-float-sheet__stats__item--right")
+
+        if float_element:
+            # Extract the float value
+            float_value = float_element.text.strip()
+            return float_value
+        else:
+            return "Float information not found for the stock."
+
+    return "Error: Unable to retrieve the stock's float."
+
+
+# Example usage
+ticker = "AAPL"  # Replace with the desired stock ticker
+stock_float = get_stock_float(ticker)
+print(f"The float of {ticker} is: {stock_float}")
+
+import requests
+from bs4 import BeautifulSoup
+
+
+def get_stock_sector(ticker):
+    url = f"https://www.morningstar.com/stocks/{ticker}/quote"
+
+    # Send an HTTP GET request
+    response = requests.get(url)
+
+    print(response.status_code)
+    if response.status_code == 200:
+        # Parse the HTML content
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # Find the element containing the stock's sector
+        sector_element = soup.find("span",
+                                   class_="sal-components-ResearchNav__quoteLabel__value sal-components-ResearchNav__quoteLabel__value--large")
+
+        if sector_element:
+            # Extract the sector value
+            sector = sector_element.text.strip()
+            return sector
+        else:
+            return "Sector information not found for the stock."
+
+    return "Error: Unable to retrieve the stock's sector."
+
+
+# Example usage
+ticker = "AAPL"  # Replace with the desired stock ticker
+stock_sector = get_stock_sector(ticker)
+print(f"The sector of {ticker} is: {stock_sector}")
+
