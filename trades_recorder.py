@@ -3,7 +3,7 @@ import csv
 import pandas as pd
 import gspread
 
-import utilities
+#import scrape_utilities
 
 # from pydrive.auth import GoogleAuth
 # from pydrive.auth import ServiceAccountCredentials
@@ -14,13 +14,30 @@ from trading_charts_folder_ids import folder_ids
 trades_file = sys.argv[1]
 print(trades_file)
 
-empty_start_column = 'N'
-
 # Setup Google Sheets Connection
 gc = gspread.service_account()
 sh = gc.open("Trades")
 # Params
 worksheet = sh.worksheet("Trades")
+
+# 16 fillable data points
+date_col = worksheet.find("Date").col
+symbol_col = worksheet.find("Ticker").col
+avg_entry_col = worksheet.find("Avg Entry Price").col
+avg_exit_col = worksheet.find("Avg Exit Price").col
+first_entry_time_col = worksheet.find("Avg Exit Price").col
+last_entry_time_col = worksheet.find("Last Entry Time").col
+ideal_entry_time_col = worksheet.find("Ideal Entry Time").col
+ideal_entry_price_col = worksheet.find("Ideal Entry Price").col
+first_exit_time_col = worksheet.find("First Exit Time").col
+last_exit_time_col = worksheet.find("Last Exit Time").col
+ideal_exit_time_col = worksheet.find("Ideal Exit Time").col
+ideal_exit_price_col = worksheet.find("Ideal Exit Price").col
+dollar_volume_col = worksheet.find("$ Volume").col
+max_3_year_dollar_volume_col = worksheet.find("Max 3 Year $ Volume").col
+float_col = worksheet.find("Float").col
+market_cap_col = worksheet.find("Market Cap").col
+sector_col = worksheet.find("Sector").col
 
 # Initialize Google Sheets Data Frame
 columns = ["Ticker", "Side", "Avg Entry Price", "Avg Exit Price", "First Entry Time", "Last Entry Time",
@@ -30,6 +47,21 @@ columns = ["Ticker", "Side", "Avg Entry Price", "Avg Exit Price", "First Entry T
 gspread_df = pd.DataFrame(columns=columns)
 
 df = pd.read_csv(trades_file)
+
+# Find first cell that doesn't have an average entry price in it
+cell = worksheet.find("Avg Entry Price")
+print(worksheet.cell(2, cell.col).value)
+print(cell.col)
+i = 1
+while worksheet.cell(i, cell.col).value != None:
+    i = i + 1
+print("First cell that doesn't have an average entry price: " + str(i))
+
+# Grab the Date of the stocks that we will compute the average entry price for
+cell = worksheet.find("Date")
+print("Entry Date: " + str(worksheet.cell(i, cell.col).value))
+# TODO: parse the date into a datetime format
+
 
 # Group by symbol and time
 df = df.sort_values(['Symb', 'Time'])
@@ -63,33 +95,10 @@ print(df_avg_prices.to_string())
 
 # worksheet.append_row(values=result, table_range=empty_start_column + str((ticker[2])))
 
-alpha_list = (
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',
-    'X',
-    'Y', 'Z',
-    'AA', 'AB', 'AC', 'AD')
-
 # Columns
 cell = worksheet.find("Ticker")
 print(cell.col)
 
-# 16 fillable data points
-symbol_col = worksheet.find("Ticker").col
-avg_entry_col = worksheet.find("Avg Entry Price").col
-avg_exit_col = worksheet.find("Avg Exit Price").col
-first_entry_time_col = worksheet.find("Avg Exit Price").col
-last_entry_time_col = worksheet.find("Last Entry Time").col
-ideal_entry_time_col = worksheet.find("Ideal Entry Time").col
-ideal_entry_price_col = worksheet.find("Ideal Entry Price").col
-first_exit_time_col = worksheet.find("First Exit Time").col
-last_exit_time_col = worksheet.find("Last Exit Time").col
-ideal_exit_time_col = worksheet.find("Ideal Exit Time").col
-ideal_exit_price_col = worksheet.find("Ideal Exit Price").col
-dollar_volume_col = worksheet.find("$ Volume").col
-max_3_year_dollar_volume_col = worksheet.find("Max 3 Year $ Volume").col
-float_col = worksheet.find("Float").col
-market_cap_col = worksheet.find("Market Cap").col
-sector_col = worksheet.find("Sector").col
 
 # Ideal Entry Prices and Times #
 #   1. DD1: Track the high after 10:30am for that day
