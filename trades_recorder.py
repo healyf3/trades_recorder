@@ -24,9 +24,9 @@ worksheet = sh.worksheet("TradesTest") # testcase
 
 # Get all values from the worksheet and store in a dictionary and search for data that way. This reduces the amount
 # of API calls since there is a limit of 300 requests per minute per project and 60 requests per minute per user
-all_values_dict = worksheet.get_all_records()
+gspread_all_values_dict = worksheet.get_all_records()
 
-# Current Entries
+# Current Spreadsheet Info
 #   Date
 #   Ticker
 #   Strategy
@@ -61,7 +61,6 @@ all_values_dict = worksheet.get_all_records()
 #   Float
 #   Market Cap
 #   Sector
-
 # TODO: Remove once we know we don't want these. (Too many requests) 16 fillable data points
 #date_col = worksheet.find("Date").col
 #symbol_col = worksheet.find("Ticker").col
@@ -89,7 +88,7 @@ all_values_dict = worksheet.get_all_records()
 
 
 # Find first exit shares cell that doesn't equal entry shares cell
-for idx, entries in enumerate(all_values_dict):
+for idx, entries in enumerate(gspread_all_values_dict):
     if entries['Entry Shares'] != entries['Exit Shares']:
         break
 
@@ -144,6 +143,15 @@ if (csv_trade_side != ticker_side and
     df_avg_prices[ticker].keys().values[0] == df_share_sum[ticker].keys().values[0]):
     ticker_avg_exit = df_avg_prices[ticker].values[0]
 
+# Place average exit back in gspread_all_values_dict at the current idx
+gspread_all_values_dict[idx]['Avg Exit Price'] = ticker_avg_exit
+
+# publish updated worksheet
+df = pd.DataFrame(gspread_all_values_dict)
+#remove columns that have google sheets formulas so we don't overwrite them
+df = df.drop(columns=['% Gain/Loss', '$ Gain', 'RR'])
+worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+
 ## place data in google sheets ##
 # result = [time[idx], symbol, previous_day_dollar_volume, dollar_volume, previous_close,
 #          df.iloc[idx, df.columns.get_loc('open')], df.iloc[idx, df.columns.get_loc('close')],
@@ -192,28 +200,3 @@ if (csv_trade_side != ticker_side and
 #       a. Ideal Entry Time
 #       b. Ideal Entry Price
 #   Question: What if you are short and long within same period?
-
-## testcase
-# worksheet.update_cell(6,1, "hi")
-
-## search row for column id according to name
-cell = worksheet.find("Last Exit Time")
-print(cell.col)
-
-# prints column title
-print("print column title")
-print(worksheet.cell(2, cell.col).value)
-
-## Last complete trade cell
-i = 1
-while worksheet.cell(i, cell.col).value != None:
-    print(worksheet.cell(i, cell.col).value)
-    i = i + 1
-
-print("First Incomplete trade last completed trade")
-print(i)
-
-# Get end of list through trade date or Strategy
-
-# Make ideal exit time intervals based on strategy
-# dd1: low of day, vs low of next day vs low of next pm, etc.
