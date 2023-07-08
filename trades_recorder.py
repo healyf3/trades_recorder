@@ -63,30 +63,6 @@ gspread_all_values_dict = worksheet.get_all_records()
 #   Float
 #   Market Cap
 #   Sector
-# TODO: Remove once we know we don't want these. (Too many requests) 16 fillable data points
-#date_col = worksheet.find("Date").col
-#symbol_col = worksheet.find("Ticker").col
-#avg_entry_col = worksheet.find("Avg Entry Price").col
-#avg_exit_col = worksheet.find("Avg Exit Price").col
-#first_entry_time_col = worksheet.find("Avg Exit Price").col
-#last_entry_time_col = worksheet.find("Last Entry Time").col
-#ideal_entry_time_col = worksheet.find("Ideal Entry Time").col
-#ideal_entry_price_col = worksheet.find("Ideal Entry Price").col
-#first_exit_time_col = worksheet.find("First Exit Time").col
-#last_exit_time_col = worksheet.find("Last Exit Time").col
-#ideal_exit_time_col = worksheet.find("Ideal Exit Time").col
-#ideal_exit_price_col = worksheet.find("Ideal Exit Price").col
-#dollar_volume_col = worksheet.find("$ Volume").col
-#max_3_year_dollar_volume_col = worksheet.find("Max 3 Year $ Volume").col
-#float_col = worksheet.find("Float").col
-#market_cap_col = worksheet.find("Market Cap").col
-#sector_col = worksheet.find("Sector").col
-
-# Initialize Google Sheets Data Frame
-#columns = ["Ticker", "Side", "Avg Entry Price", "Avg Exit Price", "First Entry Time", "Last Entry Time",
-#           "Ideal Entry Time", "Ideal Entry Price", "First Exit Time", "Last Exit Time", "Ideal Exit Time",
-#           "Ideal Exit Price"]
-#gspread_df = pd.DataFrame(columns=columns)
 
 #TODO: this will probably be an etrade specific variable
 csv_file_date = datetime.today()
@@ -167,14 +143,6 @@ df = pd.DataFrame(gspread_all_values_dict)
 #remove columns that have google sheets formulas so we don't overwrite them
 df = df.drop(columns=['% Gain/Loss', '$ Gain', 'RR'])
 worksheet.update([df.columns.values.tolist()] + df.values.tolist())
-
-## place data in google sheets ##
-# result = [time[idx], symbol, previous_day_dollar_volume, dollar_volume, previous_close,
-#          df.iloc[idx, df.columns.get_loc('open')], df.iloc[idx, df.columns.get_loc('close')],
-#          next_open, next_low, next_high, next_close, next_next_open, next_next_low, next_next_high, next_next_close]
-# gspread_df.loc[len(gspread_df)] = result
-
-# worksheet.append_row(values=result, table_range=empty_start_column + str((ticker[2])))
 
 # Ideal Entry Prices and Times #
 #   1. DD1: Track the high after 10:30am for that day
