@@ -1,4 +1,5 @@
 import sys
+import os
 import csv
 import pandas as pd
 import gspread
@@ -14,6 +15,17 @@ from trading_charts_folder_ids import folder_ids
 
 trades_file = sys.argv[1]
 print(trades_file)
+
+broker = os.path.basename(trades_file).split('-')[0]
+csv_entry_names_dict = {}
+if broker == 'etrade':
+    csv_entry_names_dict = {"date": "Trade Date", "symb": "Security", "side": "Order", "qty": "Quantity", "price": "Executed Price", "time": "Time"}
+elif broker == 'cobra':
+    csv_entry_names_dict = {"symb": "Symb", "side": "Side", "qty": "Qty", "price": "Price", "time": "Time"}
+else:
+    print("wrong csv file name format")
+    sys.exit()
+
 
 # TODO: parase by cobra or etrade csv and make csv column name variables accordingly
 
@@ -70,20 +82,20 @@ csv_file_date = datetime.today()
 # Read csv file into pandas dataframe
 df = pd.read_csv(trades_file)
 # Grab share sum for tickers
-df_share_sum = df.groupby(['Symb', 'Side'])['Qty'].sum()
+df_share_sum = df.groupby([csv_entry_names_dict["symb"], csv_entry_names_dict["side"]])[csv_entry_names_dict["qty"]].sum()
 # Group by symbol and time
-df = df.sort_values(['Symb', 'Time'])
+df = df.sort_values([csv_entry_names_dict["symb"], csv_entry_names_dict['time']])
 # Add dollar value to each entry/exit
-df['dollar_val'] = df['Price'] * df['Qty']
+df['dollar_val'] = df[csv_entry_names_dict['price']] * df[csv_entry_names_dict['qty']]
 # print(df.to_string())
 # Get first and last time of both the entry and the exit
-df_time_min = df.groupby(['Symb', 'Side'])['Time'].min()
-df_time_max = df.groupby(['Symb', 'Side'])['Time'].max()
+df_time_min = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['side']])[csv_entry_names_dict['time']].min()
+df_time_max = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['side']])[csv_entry_names_dict['Time']].max()
 # Get dollar value sum
-df_dollar_sum = df.groupby(['Symb', 'Side'])['dollar_val'].sum()
+df_dollar_sum = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['Side']])['dollar_val'].sum()
 # Get weight
 #TODO: the df_weight and df_share_sum are the same data frames right now, but once we do something with the group by time, the two may be different
-df_weight = df.groupby(['Symb', 'Side'])['Qty'].sum()
+df_weight = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['side']])[csv_entry_names_dict['qty']].sum()
 
 print("first trade executions")
 print(df_time_min.to_string())
@@ -96,15 +108,15 @@ df_avg_prices = df_dollar_sum / df_weight
 print(df_avg_prices.to_string())
 
 # Find first exit shares cell that doesn't equal entry shares cell
-for idx, entries in enumerate(gspread_all_values_dict):
-    if entries['Entry Shares'] != entries['Exit Shares'] or entries['Entry Shares'] == "":
+for idx, gspread_entries in enumerate(gspread_all_values_dict):
+    if gspread_entries['Entry Shares'] != gspread_entries['Exit Shares'] or gspread_entries['Entry Shares'] == "":
 
         # Grab ticker and ticker's side from spreadsheet
-        ticker = entries['Ticker']
-        gspread_ticker_trade_side = entries['Side']
+        ticker = gspread_entries['Ticker']
+        gspread_ticker_trade_side = gspread_entries['Side']
 
         # Grab the Date of the stocks that we will compute the average entry price for
-        trade_date = datetime.strptime(entries['Date'], '%m/%d/%Y')
+        trade_date = datetime.strptime(gspread_entries['Date'], '%m/%d/%Y')
 
         #TODO: this logic isn't correct. Need to verify the time of which the side started and compare to the other side start time
         # Right now we are just recording the trade side manually
