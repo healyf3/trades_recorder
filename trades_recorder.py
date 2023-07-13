@@ -17,9 +17,11 @@ trades_file = sys.argv[1]
 print(trades_file)
 
 broker = os.path.basename(trades_file).split('-')[0]
+csv_file_date = os.path.basename(trades_file).split('cobra-')[1].split('.')[0]
+csv_file_date = datetime.strptime(csv_file_date, '%m-%d-%y')
 csv_entry_names_dict = {}
 if broker == 'etrade':
-    csv_entry_names_dict = {"date": "Trade Date", "symb": "Security", "side": "Order", "qty": "Quantity", "price": "Executed Price", "time": "Time"}
+    csv_entry_names_dict = {"date": "Trade Date", "symb": "Security", "side": "Order Type", "qty": "Quantity", "price": "Executed Price", "time": "Time"}
 elif broker == 'cobra':
     csv_entry_names_dict = {"symb": "Symb", "side": "Side", "qty": "Qty", "price": "Price", "time": "Time"}
 else:
@@ -33,8 +35,8 @@ else:
 gc = gspread.service_account()
 sh = gc.open("Trades")
 # Params
-#worksheet = sh.worksheet("Trades")
-worksheet = sh.worksheet("TradesTest") # testcase
+worksheet = sh.worksheet("Trades")
+#worksheet = sh.worksheet("TradesTest") # testcase
 
 # Get all values from the worksheet and store in a dictionary and search for data that way. This reduces the amount
 # of API calls since there is a limit of 300 requests per minute per project and 60 requests per minute per user
@@ -77,9 +79,10 @@ gspread_all_values_dict = worksheet.get_all_records()
 #   Sector
 
 #TODO: this will probably be an etrade specific variable
-csv_file_date = datetime.today()
+#csv_file_date = datetime.today()
 
 # Read csv file into pandas dataframe
+print(os.path.abspath(os.getcwd()))
 df = pd.read_csv(trades_file)
 # Grab share sum for tickers
 df_share_sum = df.groupby([csv_entry_names_dict["symb"], csv_entry_names_dict["side"]])[csv_entry_names_dict["qty"]].sum()
@@ -90,9 +93,9 @@ df['dollar_val'] = df[csv_entry_names_dict['price']] * df[csv_entry_names_dict['
 # print(df.to_string())
 # Get first and last time of both the entry and the exit
 df_time_min = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['side']])[csv_entry_names_dict['time']].min()
-df_time_max = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['side']])[csv_entry_names_dict['Time']].max()
+df_time_max = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['side']])[csv_entry_names_dict['time']].max()
 # Get dollar value sum
-df_dollar_sum = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['Side']])['dollar_val'].sum()
+df_dollar_sum = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['side']])['dollar_val'].sum()
 # Get weight
 #TODO: the df_weight and df_share_sum are the same data frames right now, but once we do something with the group by time, the two may be different
 df_weight = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['side']])[csv_entry_names_dict['qty']].sum()
@@ -134,6 +137,13 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         ticker_avg_entry_price = gspread_all_values_dict[idx]['Avg Entry Price']
         ticker_exit_shares = 0
         ticker_avg_exit_price = 0
+
+        # If ticker doesn't exist in the share sum, it may just be in another csv file so skip to the next ticker
+        # If the csv file date doesn't match the gspread trade date and the gspread trade date's entry price is none, continue
+        if df_share_sum.get(ticker) is None or \
+            ((trade_date != csv_file_date) and not ticker_entry_shares):
+            continue
+
         for val in df_share_sum[ticker].items():
             if val[0] == gspread_ticker_trade_side:
                 # Get ticker's entry shares if the side equals the entry side
