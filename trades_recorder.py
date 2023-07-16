@@ -5,7 +5,7 @@ import pandas as pd
 import gspread
 from datetime import datetime
 
-#import scrape_utilities
+# import scrape_utilities
 
 # from pydrive.auth import GoogleAuth
 # from pydrive.auth import ServiceAccountCredentials
@@ -17,26 +17,17 @@ trades_file = sys.argv[1]
 print(trades_file)
 
 broker = os.path.basename(trades_file).split('-')[0]
-csv_file_date = os.path.basename(trades_file).split('cobra-')[1].split('.')[0]
+csv_file_date = os.path.basename(trades_file).split(broker + '-')[1].split('.')[0]
 csv_file_date = datetime.strptime(csv_file_date, '%m-%d-%y')
-csv_entry_names_dict = {}
-if broker == 'etrade':
-    csv_entry_names_dict = {"date": "Trade Date", "symb": "Security", "side": "Order Type", "qty": "Quantity", "price": "Executed Price", "time": "Time"}
-elif broker == 'cobra':
-    csv_entry_names_dict = {"symb": "Symb", "side": "Side", "qty": "Qty", "price": "Price", "time": "Time"}
-else:
-    print("wrong csv file name format")
-    sys.exit()
 
-
-# TODO: parase by cobra or etrade csv and make csv column name variables accordingly
+# TODO: parse by cobra or etrade csv and make csv column name variables accordingly
 
 # Setup Google Sheets Connection
 gc = gspread.service_account()
 sh = gc.open("Trades")
 # Params
 worksheet = sh.worksheet("Trades")
-#worksheet = sh.worksheet("TradesTest") # testcase
+# worksheet = sh.worksheet("TradesTest") # testcase
 
 # Get all values from the worksheet and store in a dictionary and search for data that way. This reduces the amount
 # of API calls since there is a limit of 300 requests per minute per project and 60 requests per minute per user
@@ -78,36 +69,72 @@ gspread_all_values_dict = worksheet.get_all_records()
 #   Market Cap
 #   Sector
 
-#TODO: this will probably be an etrade specific variable
-#csv_file_date = datetime.today()
+# TODO: this will probably be an etrade specific variable
+# csv_file_date = datetime.today()
 
 # Read csv file into pandas dataframe
 print(os.path.abspath(os.getcwd()))
-df = pd.read_csv(trades_file)
+
+if broker == 'etrade':
+    df = pd.DataFrame(columns=["Date", "Time", "Side", "Qty", "Symb", "Price"])
+
+    with open(trades_file, "r") as f:
+        # reader = csv.reader(f, delimiter="\t")
+        reader = csv.reader(f)
+        for i, line in enumerate(reader):
+            # line list
+            ll = line[0].replace('\t\t', ',').replace(' ', ',').split(",")
+            # don't read cancelled or pending entries
+            if ll[7] != 'Executed':
+                continue
+            # join time and AM/PM
+            ll[1:3] = [' '.join(ll[1:3])]
+            # remove tabs from copy and pasted line
+            ll[0] = ll[0].replace('\t', '')
+            # remove the dollar sign and tabs
+            ll[8] = ll[8].replace('$', '').replace('\t', '')
+            #df_list[0] -> Date
+            #df_list[1] -> Time
+            #df_list[2] -> Type
+            #df_list[3] -> Qty
+            #df_list[4] -> Symb
+            #df_list[5] -> Price
+            df_list = [ll[0], ll[1], ll[3], int(ll[4]), ll[5], float(ll[8])]
+            df.loc[len(df)] = df_list
+
+elif broker == 'cobra':
+    df = pd.read_csv(trades_file)
+else:
+    print("wrong csv file name format")
+    sys.exit()
+
 # Grab share sum for tickers
-df_share_sum = df.groupby([csv_entry_names_dict["symb"], csv_entry_names_dict["side"]])[csv_entry_names_dict["qty"]].sum()
+df_share_sum = df.groupby(['Symb', 'Side'])['Qty'].sum()
 # Group by symbol and time
-df = df.sort_values([csv_entry_names_dict["symb"], csv_entry_names_dict['time']])
+df = df.sort_values(['Symb', 'Time'])
 # Add dollar value to each entry/exit
-df['dollar_val'] = df[csv_entry_names_dict['price']] * df[csv_entry_names_dict['qty']]
+df['dollar_val'] = df['Price'] * df['Qty']
 # print(df.to_string())
 # Get first and last time of both the entry and the exit
-df_time_min = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['side']])[csv_entry_names_dict['time']].min()
-df_time_max = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['side']])[csv_entry_names_dict['time']].max()
+df_time_min = df.groupby(['Symb', 'Side'])['Time'].min()
+df_time_max = df.groupby(['Symb', 'Side'])['Time'].max()
 # Get dollar value sum
-df_dollar_sum = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['side']])['dollar_val'].sum()
+df_dollar_sum = df.groupby(['Symb', 'Side'])['dollar_val'].sum()
 # Get weight
-#TODO: the df_weight and df_share_sum are the same data frames right now, but once we do something with the group by time, the two may be different
-df_weight = df.groupby([csv_entry_names_dict['symb'], csv_entry_names_dict['side']])[csv_entry_names_dict['qty']].sum()
+# TODO: the df_weight and df_share_sum are the same data frames right now, but once we do something with the group by time, the two may be different
+df_weight = df.groupby(['Symb', 'Side'])['Qty'].sum()
 
 print("first trade executions")
 print(df_time_min.to_string())
 print("last trade executions")
 print(df_time_max.to_string())
+print("Dollar Sum")
 print(df_dollar_sum.to_string())
+print("Weight")
 print(df_weight.to_string())
 # Compute Average Price
 df_avg_prices = df_dollar_sum / df_weight
+print("Avgerage Pricing")
 print(df_avg_prices.to_string())
 
 # Find first exit shares cell that doesn't equal entry shares cell
@@ -117,42 +144,46 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         # Grab ticker and ticker's side from spreadsheet
         ticker = gspread_entries['Ticker']
         gspread_ticker_trade_side = gspread_entries['Side']
+        if gspread_ticker_trade_side == "":
+            print("The trade side is unknown in gspread. Fill out this cell to continue")
+            continue
 
         # Grab the Date of the stocks that we will compute the average entry price for
         trade_date = datetime.strptime(gspread_entries['Date'], '%m/%d/%Y')
 
-        #TODO: this logic isn't correct. Need to verify the time of which the side started and compare to the other side start time
+        # TODO: this logic isn't correct. Need to verify the time of which the side started and compare to the other side start time
         # Right now we are just recording the trade side manually
-       # # Get Side of the trade from the csv data for the given ticker
-       # csv_ticker_trade_side = df_share_sum[ticker].keys().values[0]
-       # if gspread_ticker_trade_side == "":
-       #     gspread_ticker_trade_side = csv_ticker_trade_side
+        # # Get Side of the trade from the csv data for the given ticker
+        # csv_ticker_trade_side = df_share_sum[ticker].keys().values[0]
+        # if gspread_ticker_trade_side == "":
+        #     gspread_ticker_trade_side = csv_ticker_trade_side
 
-        #TODO: reevaluate average pricing for adds on different days (low priority)
-        #ticker_entry_shares = gspread_all_values_dict[idx]['Entry Shares']
-        #ticker_avg_entry_price = gspread_all_values_dict[idx]['Avg Entry Price']
-        #ticker_exit_shares = gspread_all_values_dict[idx]['Exit Shares']
-        #ticker_avg_exit_price = gspread_all_values_dict[idx]['Avg Exit Price']
+        # TODO: reevaluate average pricing for adds on different days (low priority)
+        # ticker_entry_shares = gspread_all_values_dict[idx]['Entry Shares']
+        # ticker_avg_entry_price = gspread_all_values_dict[idx]['Avg Entry Price']
+        # ticker_exit_shares = gspread_all_values_dict[idx]['Exit Shares']
+        # ticker_avg_exit_price = gspread_all_values_dict[idx]['Avg Exit Price']
         ticker_entry_shares = gspread_all_values_dict[idx]['Entry Shares']
         ticker_avg_entry_price = gspread_all_values_dict[idx]['Avg Entry Price']
-        ticker_exit_shares = 0
-        ticker_avg_exit_price = 0
+        ticker_exit_shares = gspread_all_values_dict[idx]['Avg Exit Price']
+        ticker_avg_exit_price = gspread_all_values_dict[idx]['Avg Exit Price']
 
-        # If ticker doesn't exist in the share sum, it may just be in another csv file so skip to the next ticker
+        # If ticker doesn't exist in the share sum data frame, it may just be in another csv file so skip to the next ticker.
         # If the csv file date doesn't match the gspread trade date and the gspread trade date's entry price is none, continue
+        # because that's a different trade.
         if df_share_sum.get(ticker) is None or \
-            ((trade_date != csv_file_date) and not ticker_entry_shares):
+                ((trade_date != csv_file_date) and not ticker_entry_shares):
             continue
 
         for val in df_share_sum[ticker].items():
             if val[0] == gspread_ticker_trade_side:
                 # Get ticker's entry shares if the side equals the entry side
-                ticker_entry_shares = val[1]
+                ticker_entry_shares += val[1]
                 ticker_avg_entry_price = df_avg_prices[ticker][val[0]]
             else:
                 # Get ticker's exit shares if the side is opposite the entry side
                 ticker_exit_shares = val[1]
-                ticker_avg_exit_price = df_avg_prices[ticker][val[0]]
+                ticker_avg_exit_price += df_avg_prices[ticker][val[0]]
 
         # Place average entry and exit, entry and exit shares back in gspread_all_values_dict at the current idx
         gspread_all_values_dict[idx]['Entry Shares'] = ticker_entry_shares
@@ -162,7 +193,7 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
 
 # publish updated worksheet
 df = pd.DataFrame(gspread_all_values_dict)
-#remove columns that have google sheets formulas so we don't overwrite them
+# remove columns that have google sheets formulas so we don't overwrite them
 df = df.drop(columns=['% Gain/Loss', '$ Gain', 'RR'])
 worksheet.update([df.columns.values.tolist()] + df.values.tolist())
 
@@ -181,7 +212,6 @@ worksheet.update([df.columns.values.tolist()] + df.values.tolist())
 #   4. Below Vwap Afternoon Fade: Manually record when it drops to or below vwap. Track the low after until next day
 #   5. Afternoon Breakout FGD: After breakout price was hit after 1pm, track low starting at breakout time for that day
 #   6. FailSpike below Vwap Consolidate: After under Vwap for one hour, track low after until next day
-
 
 
 # TODO:
