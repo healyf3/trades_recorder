@@ -4,6 +4,7 @@ import csv
 import pandas as pd
 import gspread
 from datetime import datetime
+import re
 
 # import scrape_utilities
 
@@ -17,7 +18,7 @@ trades_file = sys.argv[1]
 print(trades_file)
 
 broker = os.path.basename(trades_file).split('-')[0]
-csv_file_date = os.path.basename(trades_file).split(broker + '-')[1].split('.')[0]
+csv_file_date = re.split('_|\.',os.path.basename(trades_file).split(broker + '-')[1])[0]
 csv_file_date = datetime.strptime(csv_file_date, '%m-%d-%y')
 
 # TODO: parse by cobra or etrade csv and make csv column name variables accordingly
@@ -76,7 +77,7 @@ gspread_all_values_dict = worksheet.get_all_records()
 print(os.path.abspath(os.getcwd()))
 
 if broker == 'etrade':
-    df = pd.DataFrame(columns=["Date", "Time", "Side", "Qty", "Symb", "Price"])
+    csv_df = pd.DataFrame(columns=["Date", "Time", "Side", "Qty", "Symb", "Price"])
 
     with open(trades_file, "r") as f:
         # reader = csv.reader(f, delimiter="\t")
@@ -93,49 +94,49 @@ if broker == 'etrade':
             ll[0] = ll[0].replace('\t', '')
             # remove the dollar sign and tabs
             ll[8] = ll[8].replace('$', '').replace('\t', '')
-            #df_list[0] -> Date
-            #df_list[1] -> Time
-            #df_list[2] -> Type
-            #df_list[3] -> Qty
-            #df_list[4] -> Symb
-            #df_list[5] -> Price
-            df_list = [ll[0], ll[1], ll[3], int(ll[4]), ll[5], float(ll[8])]
-            df.loc[len(df)] = df_list
+            #csv_df_list[0] -> Date
+            #csv_df_list[1] -> Time
+            #csv_df_list[2] -> Type
+            #csv_df_list[3] -> Qty
+            #csv_df_list[4] -> Symb
+            #csv_df_list[5] -> Price
+            csv_df_list = [ll[0], ll[1], ll[3], int(ll[4]), ll[5], float(ll[8])]
+            csv_df.loc[len(csv_df)] = csv_df_list
 
 elif broker == 'cobra':
-    df = pd.read_csv(trades_file)
+    csv_df = pd.read_csv(trades_file)
 else:
     print("wrong csv file name format")
     sys.exit()
 
 # Grab share sum for tickers
-df_share_sum = df.groupby(['Symb', 'Side'])['Qty'].sum()
+csv_df_share_sum = csv_df.groupby(['Symb', 'Side'])['Qty'].sum()
 # Group by symbol and time
-df = df.sort_values(['Symb', 'Time'])
+csv_df = csv_df.sort_values(['Symb', 'Time'])
 # Add dollar value to each entry/exit
-df['dollar_val'] = df['Price'] * df['Qty']
-# print(df.to_string())
+csv_df['dollar_val'] = csv_df['Price'] * csv_df['Qty']
+# print(csv_df.to_string())
 # Get first and last time of both the entry and the exit
-df_time_min = df.groupby(['Symb', 'Side'])['Time'].min()
-df_time_max = df.groupby(['Symb', 'Side'])['Time'].max()
+csv_df_time_min = csv_df.groupby(['Symb', 'Side'])['Time'].min()
+csv_df_time_max = csv_df.groupby(['Symb', 'Side'])['Time'].max()
 # Get dollar value sum
-df_dollar_sum = df.groupby(['Symb', 'Side'])['dollar_val'].sum()
+csv_df_dollar_sum = csv_df.groupby(['Symb', 'Side'])['dollar_val'].sum()
 # Get weight
-# TODO: the df_weight and df_share_sum are the same data frames right now, but once we do something with the group by time, the two may be different
-df_weight = df.groupby(['Symb', 'Side'])['Qty'].sum()
+# TODO: the csv_df_weight and csv_df_share_sum are the same data frames right now, but once we do something with the group by time, the two may be different
+csv_df_weight = csv_df.groupby(['Symb', 'Side'])['Qty'].sum()
 
 print("first trade executions")
-print(df_time_min.to_string())
+print(csv_df_time_min.to_string())
 print("last trade executions")
-print(df_time_max.to_string())
+print(csv_df_time_max.to_string())
 print("Dollar Sum")
-print(df_dollar_sum.to_string())
+print(csv_df_dollar_sum.to_string())
 print("Weight")
-print(df_weight.to_string())
-# Compute Average Price
-df_avg_prices = df_dollar_sum / df_weight
+print(csv_df_weight.to_string())
+# Compute Average Price from csv file
+csv_df_avg_prices = csv_df_dollar_sum / csv_df_weight
 print("Avgerage Pricing")
-print(df_avg_prices.to_string())
+print(csv_df_avg_prices.to_string())
 
 # Find first exit shares cell that doesn't equal entry shares cell
 for idx, gspread_entries in enumerate(gspread_all_values_dict):
@@ -154,7 +155,7 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         # TODO: this logic isn't correct. Need to verify the time of which the side started and compare to the other side start time
         # Right now we are just recording the trade side manually
         # # Get Side of the trade from the csv data for the given ticker
-        # csv_ticker_trade_side = df_share_sum[ticker].keys().values[0]
+        # csv_ticker_trade_side = csv_df_share_sum[ticker].keys().values[0]
         # if gspread_ticker_trade_side == "":
         #     gspread_ticker_trade_side = csv_ticker_trade_side
 
@@ -171,19 +172,25 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         # If ticker doesn't exist in the share sum data frame, it may just be in another csv file so skip to the next ticker.
         # If the csv file date doesn't match the gspread trade date and the gspread trade date's entry price is none, continue
         # because that's a different trade.
-        if df_share_sum.get(ticker) is None or \
+        if csv_df_share_sum.get(ticker) is None or \
                 ((trade_date != csv_file_date) and not ticker_entry_shares):
             continue
 
-        for val in df_share_sum[ticker].items():
+        for val in csv_df_share_sum[ticker].items():
             if val[0] == gspread_ticker_trade_side:
+                # change ticker_entry_shares to int if we haven't filled it out yet
+                if ticker_entry_shares == '':
+                    ticker_entry_shares = 0
                 # Get ticker's entry shares if the side equals the entry side
                 ticker_entry_shares += val[1]
-                ticker_avg_entry_price = df_avg_prices[ticker][val[0]]
+                ticker_avg_entry_price = csv_df_avg_prices[ticker][val[0]]
             else:
+                # change ticker_exit_shares to int if we haven't filled it out yet
+                if ticker_exit_shares == '':
+                    ticker_exit_shares = 0
                 # Get ticker's exit shares if the side is opposite the entry side
-                ticker_exit_shares = val[1]
-                ticker_avg_exit_price += df_avg_prices[ticker][val[0]]
+                ticker_exit_shares += val[1]
+                ticker_avg_exit_price = csv_df_avg_prices[ticker][val[0]]
 
         # Place average entry and exit, entry and exit shares back in gspread_all_values_dict at the current idx
         gspread_all_values_dict[idx]['Entry Shares'] = ticker_entry_shares
@@ -192,10 +199,10 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         gspread_all_values_dict[idx]['Avg Exit Price'] = ticker_avg_exit_price
 
 # publish updated worksheet
-df = pd.DataFrame(gspread_all_values_dict)
+gspread_df = pd.DataFrame(gspread_all_values_dict)
 # remove columns that have google sheets formulas so we don't overwrite them
-df = df.drop(columns=['% Gain/Loss', '$ Gain', 'RR'])
-worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+gspread_df = gspread_df.drop(columns=['% Gain/Loss', '$ Gain', 'RR'])
+worksheet.update([gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
 
 # Ideal Entry Prices and Times #
 #   1. DD1: Track the high after 10:30am for that day
