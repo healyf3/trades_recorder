@@ -7,21 +7,15 @@ from datetime import datetime
 import re
 
 # import scrape_utilities
-
-# from pydrive.auth import GoogleAuth
-# from pydrive.auth import ServiceAccountCredentials
-# from pydrive.drive import GoogleDrive
-
+import file_utilities
 from trading_charts_folder_ids import folder_ids
 
 trades_file = sys.argv[1]
 print(trades_file)
 
-broker = os.path.basename(trades_file).split('-')[0]
-csv_file_date = re.split('_|\.',os.path.basename(trades_file).split(broker + '-')[1])[0]
-csv_file_date = datetime.strptime(csv_file_date, '%m-%d-%y')
-
-# TODO: parse by cobra or etrade csv and make csv column name variables accordingly
+# grab broker type and file date from csv file name
+broker = file_utilities.get_broker(trades_file)
+csv_file_date = file_utilities.get_date(trades_file)
 
 # Setup Google Sheets Connection
 gc = gspread.service_account()
@@ -70,47 +64,12 @@ gspread_all_values_dict = worksheet.get_all_records()
 #   Market Cap
 #   Sector
 
-# TODO: this will probably be an etrade specific variable
+# TODO: this will probably be an etrade specific variable if we are grabbing from the etrade website trade document
 # csv_file_date = datetime.today()
 
 # Read csv file into pandas dataframe
-print(os.path.abspath(os.getcwd()))
+csv_df = file_utilities.trades_csv_to_df(trades_file)
 
-if broker == 'etrade':
-    csv_df = pd.DataFrame(columns=["Date", "Time", "Side", "Qty", "Symb", "Price"])
-
-    with open(trades_file, "r") as f:
-        # reader = csv.reader(f, delimiter="\t")
-        reader = csv.reader(f)
-        for i, line in enumerate(reader):
-            # line list
-            ll = line[0].replace('\t\t', ',').replace(' ', ',').split(",")
-            # don't read cancelled or pending entries
-            if ll[7] != 'Executed':
-                continue
-            # join time and AM/PM
-            ll[1:3] = [' '.join(ll[1:3])]
-            # remove tabs from copy and pasted line
-            ll[0] = ll[0].replace('\t', '')
-            # remove the dollar sign and tabs
-            ll[8] = ll[8].replace('$', '').replace('\t', '')
-            #csv_df_list[0] -> Date
-            #csv_df_list[1] -> Time
-            #csv_df_list[2] -> Type
-            #csv_df_list[3] -> Qty
-            #csv_df_list[4] -> Symb
-            #csv_df_list[5] -> Price
-            csv_df_list = [ll[0], ll[1], ll[3], int(ll[4]), ll[5], float(ll[8])]
-            csv_df.loc[len(csv_df)] = csv_df_list
-
-elif broker == 'cobra':
-    csv_df = pd.read_csv(trades_file)
-else:
-    print("wrong csv file name format")
-    sys.exit()
-
-# Grab share sum for tickers
-csv_df_share_sum = csv_df.groupby(['Symb', 'Side'])['Qty'].sum()
 # Group by symbol and time
 csv_df = csv_df.sort_values(['Symb', 'Time'])
 # Add dollar value to each entry/exit
@@ -121,22 +80,24 @@ csv_df_time_min = csv_df.groupby(['Symb', 'Side'])['Time'].min()
 csv_df_time_max = csv_df.groupby(['Symb', 'Side'])['Time'].max()
 # Get dollar value sum
 csv_df_dollar_sum = csv_df.groupby(['Symb', 'Side'])['dollar_val'].sum()
-# Get weight
-# TODO: the csv_df_weight and csv_df_share_sum are the same data frames right now, but once we do something with the group by time, the two may be different
+# Grab share sum for tickers (weight)
+csv_df_share_sum = csv_df.groupby(['Symb', 'Side'])['Qty'].sum()
 csv_df_weight = csv_df.groupby(['Symb', 'Side'])['Qty'].sum()
 
 print("first trade executions")
 print(csv_df_time_min.to_string())
 print("last trade executions")
 print(csv_df_time_max.to_string())
-print("Dollar Sum")
-print(csv_df_dollar_sum.to_string())
-print("Weight")
-print(csv_df_weight.to_string())
 # Compute Average Price from csv file
-csv_df_avg_prices = csv_df_dollar_sum / csv_df_weight
-print("Avgerage Pricing")
+csv_df_avg_prices = csv_df_dollar_sum / csv_df_share_sum
+print("Average Pricing")
 print(csv_df_avg_prices.to_string())
+
+# TODO: the start of recognizing different trades from the same ticker. More logic than what its
+#for symb in csv_df.Symb.unique():
+#    if csv_df.loc([symb == ''])
+#    print(symb)
+
 
 # Find first exit shares cell that doesn't equal entry shares cell
 for idx, gspread_entries in enumerate(gspread_all_values_dict):
