@@ -8,6 +8,7 @@ import re
 
 # import scrape_utilities
 import file_utilities
+import hloc_utilities
 from trading_charts_folder_ids import folder_ids
 
 trades_file = sys.argv[1]
@@ -63,6 +64,8 @@ gspread_all_values_dict = worksheet.get_all_records()
 #   Float
 #   Market Cap
 #   Sector
+#   % Open Gain
+gspread_last_raw_value_column = '% Open Gain'
 
 # TODO: this will probably be an etrade specific variable if we are grabbing from the etrade website trade document
 # csv_file_date = datetime.today()
@@ -121,14 +124,14 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         #     gspread_ticker_trade_side = csv_ticker_trade_side
 
         # TODO: reevaluate average pricing for adds on different days (low priority)
-        # ticker_entry_shares = gspread_all_values_dict[idx]['Entry Shares']
-        # ticker_avg_entry_price = gspread_all_values_dict[idx]['Avg Entry Price']
-        # ticker_exit_shares = gspread_all_values_dict[idx]['Exit Shares']
-        # ticker_avg_exit_price = gspread_all_values_dict[idx]['Avg Exit Price']
         ticker_entry_shares = gspread_all_values_dict[idx]['Entry Shares']
         ticker_avg_entry_price = gspread_all_values_dict[idx]['Avg Entry Price']
         ticker_exit_shares = gspread_all_values_dict[idx]['Avg Exit Price']
         ticker_avg_exit_price = gspread_all_values_dict[idx]['Avg Exit Price']
+        ticker_first_entry_datetime = gspread_all_values_dict[idx]['First Entry Time']
+        ticker_last_entry_datetime = gspread_all_values_dict[idx]['Last Entry Time']
+        ticker_first_exit_datetime = gspread_all_values_dict[idx]['First Exit Time']
+        ticker_last_exit_datetime = gspread_all_values_dict[idx]['Last Exit Time']
 
         # If ticker doesn't exist in the share sum data frame, it may just be in another csv file so skip to the next ticker.
         # If the csv file date doesn't match the gspread trade date and the gspread trade date's entry price is none, continue
@@ -145,6 +148,12 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                 # Get ticker's entry shares if the side equals the entry side
                 ticker_entry_shares += val[1]
                 ticker_avg_entry_price = csv_df_avg_prices[ticker][val[0]]
+                # assign first and last entry times
+                if ticker_first_entry_datetime == '':
+                    first_entry_time = datetime.strptime(csv_df_time_min[ticker][val[0]], '%H:%M:%S')
+                    ticker_first_entry_datetime = datetime.combine(trade_date, first_entry_time.time())
+                last_entry_time = datetime.strptime(csv_df_time_max[ticker][val[0]], '%H:%M:%S')
+                ticker_last_entry_datetime = datetime.combine(trade_date, last_entry_time.time())
             else:
                 # change ticker_exit_shares to int if we haven't filled it out yet
                 if ticker_exit_shares == '':
@@ -152,55 +161,65 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                 # Get ticker's exit shares if the side is opposite the entry side
                 ticker_exit_shares += val[1]
                 ticker_avg_exit_price = csv_df_avg_prices[ticker][val[0]]
+                # assign first and last exit times
+                if ticker_first_exit_datetime == '':
+                    first_exit_time = datetime.strptime(csv_df_time_min[ticker][val[0]], '%H:%M:%S')
+                    ticker_first_exit_datetime = datetime.combine(trade_date, first_exit_time.time())
+                last_exit_time = datetime.strptime(csv_df_time_max[ticker][val[0]], '%H:%M:%S')
+                ticker_last_exit_datetime = datetime.combine(trade_date, last_exit_time.time())
 
-        # Place average entry and exit, entry and exit shares back in gspread_all_values_dict at the current idx
+
+        #TODO: start of polygon logic
+        df = hloc_utilities.get_intraday_ticks(ticker, trade_date)
+
+
+        # Place average entry and exit, entry and exit shares, and times back in gspread_all_values_dict at the current idx
         gspread_all_values_dict[idx]['Entry Shares'] = ticker_entry_shares
         gspread_all_values_dict[idx]['Avg Entry Price'] = ticker_avg_entry_price
         gspread_all_values_dict[idx]['Exit Shares'] = ticker_exit_shares
         gspread_all_values_dict[idx]['Avg Exit Price'] = ticker_avg_exit_price
+        gspread_all_values_dict[idx]['First Entry Time'] = str(ticker_first_entry_datetime)
+        gspread_all_values_dict[idx]['Last Entry Time'] = str(ticker_last_entry_datetime)
+        gspread_all_values_dict[idx]['First Exit Time'] = str(ticker_first_exit_datetime)
+        gspread_all_values_dict[idx]['Last Exit Time'] = str(ticker_last_exit_datetime)
+
+        # Ideal Entry Prices and Times #
+        #   1. dd1: Track the high after 10:30am for that day
+        #   2. oegd: Track the high before 10:30am for that day
+        #   3. md bo: After breakout price was hit, track low starting at breakout time and before the high of day
+        #   4. vwap tank: Manually record when it drops to or below vwap. Then track the high after
+        #   5. aft bo: After breakout price was hit after 1pm, track low starting at breakout time and before high of day
+        #   6. FailSpike below Vwap Consolidate: After under Vwap for one hour, track high
+
+        # Ideal Exit Prices and Times #
+        #   1. dd1: Track the low after 10:30am between that day and next
+        #   2. oegd: Track the low for that day
+        #   3. md bo: After breakout price was hit, track high starting at breakout time for that day
+        #   4. vwap tank: Manually record when it drops to or below vwap. Track the low after until next day
+        #   5. aft bo: After breakout price was hit after 1pm, track low starting at breakout time for that day
+        #   6. FailSpike below Vwap Consolidate: After under Vwap for one hour, track low after until next day
+
+        # Grabbing csv data:
+        #   * Search for first column where entry shares don't equal exit shares
+        #   * If exit shares are greater than entry shares, start a new trade column
+        #   * From that row, match csv ticker with google sheets ticker
+        #   * If googlesheets ticker doesn't exist after going to last row, make new row with 'B' or 'SS'.
+        #   * Add share amount
+        #   * Return Error if type is 'S' for new row
+        #   * If you found an existing row, make sure the csv type is opposite the side. Otherwise, return error
+        #   * If you are starting on a new row, you can Grab the following from the csv file:
+        #       a. First Entry Time
+        #       b. Last Entry Time
+        #   * If you are starting on a new row, you can Compute the following from the csv file:
+        #       a. Avg Entry Price
+        #   * If you are starting on a new row, you can compute the following from polygon.io:
+        #       a. Ideal Entry Time
+        #       b. Ideal Entry Price
+        #   Question: What if you are short and long within same period?
+
 
 # publish updated worksheet
 gspread_df = pd.DataFrame(gspread_all_values_dict)
 # remove columns that have google sheets formulas so we don't overwrite them
-gspread_df = gspread_df.drop(columns=['% Gain/Loss', '$ Gain', 'RR'])
+gspread_df = gspread_df.loc[:,:gspread_last_raw_value_column]
 worksheet.update([gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
-
-# Ideal Entry Prices and Times #
-#   1. DD1: Track the high after 10:30am for that day
-#   2. OEGD: Track the high before 10:30am for that day
-#   3. Multi Day Breakout: After breakout price was hit, track low starting at breakout time and before the high of day
-#   4. Below Vwap Afternoon Fade: Manually record when it drops to or below vwap. Then track the high after
-#   5. Afternoon Breakout FGD: After breakout price was hit after 1pm, track low starting at breakout time and before high of day
-#   6. FailSpike below Vwap Consolidate: After under Vwap for one hour, track high
-
-# Ideal Exit Prices and Times #
-#   1. DD1: Track the low after 10:30am between that day and next
-#   2. OEGD: Track the low for that day
-#   3. Multi Day Breakout: After breakout price was hit, track high starting at breakout time for that day
-#   4. Below Vwap Afternoon Fade: Manually record when it drops to or below vwap. Track the low after until next day
-#   5. Afternoon Breakout FGD: After breakout price was hit after 1pm, track low starting at breakout time for that day
-#   6. FailSpike below Vwap Consolidate: After under Vwap for one hour, track low after until next day
-
-
-# TODO:
-# Focus on dd1 entry and exit price and time
-# 1. Finish typing out plan for Avg Entry and Exit Prices
-# 2. Make RR formula in google sheets depending on whether you longed or shorted
-
-# Grabbing csv data:
-#   * Search for first column where entry shares don't equal exit shares
-#   * If exit shares are greater than entry shares, start a new trade column
-#   * From that row, match csv ticker with google sheets ticker
-#   * If googlesheets ticker doesn't exist after going to last row, make new row with 'B' or 'SS'.
-#   * Add share amount
-#   * Return Error if type is 'S' for new row
-#   * If you found an existing row, make sure the csv type is opposite the side. Otherwise, return error
-#   * If you are starting on a new row, you can Grab the following from the csv file:
-#       a. First Entry Time
-#       b. Last Entry Time
-#   * If you are starting on a new row, you can Compute the following from the csv file:
-#       a. Avg Entry Price
-#   * If you are starting on a new row, you can compute the following from polygon.io:
-#       a. Ideal Entry Time
-#       b. Ideal Entry Price
-#   Question: What if you are short and long within same period?
