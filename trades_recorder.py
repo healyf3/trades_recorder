@@ -18,6 +18,10 @@ print(trades_file)
 broker = file_utilities.get_broker(trades_file)
 csv_file_date = file_utilities.get_date(trades_file)
 
+time_fmt = '%H:%M:%S'
+if 'etrade' == broker:
+    time_fmt = '%H:%M'
+
 # Setup Google Sheets Connection
 gc = gspread.service_account()
 sh = gc.open("Trades")
@@ -150,9 +154,9 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                 ticker_avg_entry_price = csv_df_avg_prices[ticker][val[0]]
                 # assign first and last entry times
                 if ticker_first_entry_datetime == '':
-                    first_entry_time = datetime.strptime(csv_df_time_min[ticker][val[0]], '%H:%M:%S')
+                    first_entry_time = datetime.strptime(csv_df_time_min[ticker][val[0]], time_fmt)
                     ticker_first_entry_datetime = datetime.combine(trade_date, first_entry_time.time())
-                last_entry_time = datetime.strptime(csv_df_time_max[ticker][val[0]], '%H:%M:%S')
+                last_entry_time = datetime.strptime(csv_df_time_max[ticker][val[0]], time_fmt)
                 ticker_last_entry_datetime = datetime.combine(trade_date, last_entry_time.time())
             else:
                 # change ticker_exit_shares to int if we haven't filled it out yet
@@ -163,9 +167,9 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                 ticker_avg_exit_price = csv_df_avg_prices[ticker][val[0]]
                 # assign first and last exit times
                 if ticker_first_exit_datetime == '':
-                    first_exit_time = datetime.strptime(csv_df_time_min[ticker][val[0]], '%H:%M:%S')
+                    first_exit_time = datetime.strptime(csv_df_time_min[ticker][val[0]], time_fmt)
                     ticker_first_exit_datetime = datetime.combine(trade_date, first_exit_time.time())
-                last_exit_time = datetime.strptime(csv_df_time_max[ticker][val[0]], '%H:%M:%S')
+                last_exit_time = datetime.strptime(csv_df_time_max[ticker][val[0]], time_fmt)
                 ticker_last_exit_datetime = datetime.combine(trade_date, last_exit_time.time())
 
 
