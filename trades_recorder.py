@@ -130,7 +130,7 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         # TODO: reevaluate average pricing for adds on different days (low priority)
         ticker_entry_shares = gspread_all_values_dict[idx]['Entry Shares']
         ticker_avg_entry_price = gspread_all_values_dict[idx]['Avg Entry Price']
-        ticker_exit_shares = gspread_all_values_dict[idx]['Avg Exit Price']
+        ticker_exit_shares = gspread_all_values_dict[idx]['Exit Shares']
         ticker_avg_exit_price = gspread_all_values_dict[idx]['Avg Exit Price']
         ticker_first_entry_datetime = gspread_all_values_dict[idx]['First Entry Time']
         ticker_last_entry_datetime = gspread_all_values_dict[idx]['Last Entry Time']
@@ -174,7 +174,7 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
 
 
         #TODO: start of polygon logic
-        df = hloc_utilities.get_intraday_ticks(ticker, trade_date)
+        #df = hloc_utilities.get_intraday_ticks(ticker, trade_date)
 
 
         # Place average entry and exit, entry and exit shares, and times back in gspread_all_values_dict at the current idx
