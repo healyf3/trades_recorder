@@ -31,7 +31,7 @@ def trades_csv_to_df(trades_file):
                 # line list
                 ll = line[0].replace('\t\t', ',').replace(' ', ',').split(",")
                 # don't read cancelled or pending entries
-                if ll[7] != 'Executed':
+                if ll[0].isspace() or ll[-3] != 'Executed':
                     continue
                 # join time and AM/PM
                 ll[1:3] = [' '.join(ll[1:3])]
@@ -40,13 +40,13 @@ def trades_csv_to_df(trades_file):
                 # remove tabs from copy and pasted line
                 ll[0] = ll[0].replace('\t', '')
                 # remove the dollar sign and tabs
-                ll[8] = ll[8].replace('$', '').replace('\t', '')
+                ll[-1] = ll[-1].replace('$', '').replace('\t', '')
                 # ll[0] -> Date
                 # ll[1] -> Time
                 # ll[3] -> Type
                 # ll[4] -> Qty
                 # ll[5] -> Symb
-                # ll[8] -> Price
+                # ll[-1] -> Price
                 # csv_df_list[0] -> Date
                 # csv_df_list[1] -> Time
                 # csv_df_list[2] -> Type
@@ -55,7 +55,11 @@ def trades_csv_to_df(trades_file):
                 # csv_df_list[5] -> Price
                 if 'Buy' == ll[3]: ll[3] = 'B' # So it's consistent with Cobra's naming convention
                 if 'Sell' == ll[3]: ll[3] = 'S' # So it's consistent with Cobra's naming convention
-                csv_df_list = [ll[0], ll[1], ll[3], int(ll[4]), ll[5], float(ll[8])]
+
+                # For option trades
+                if 'Call' in ll or 'Put' in ll:
+                    ll[4] = 100*int(ll[4])
+                csv_df_list = [ll[0], ll[1], ll[3], int(ll[4]), ll[5], float(ll[-1])]
                 csv_df.loc[len(csv_df)] = csv_df_list
 
     elif broker == 'cobra':
@@ -68,7 +72,8 @@ def trades_csv_to_df(trades_file):
 
 
 def export_trades_df_to_csv(df, trades_file, description):
-    df.to_csv(trades_file.split('.')[0] + '_' + description + '.csv', index=False)
+    csv_idx = trades_file.index(".csv")
+    df.to_csv(trades_file[:csv_idx] + '_' + description + '.csv', index=False)
 
 def convert24(str1):
 
