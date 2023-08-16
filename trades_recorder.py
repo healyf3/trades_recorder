@@ -114,7 +114,7 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         ticker = gspread_entries['Ticker']
         gspread_ticker_trade_side = gspread_entries['Side']
         if gspread_ticker_trade_side == "":
-            print("The trade side is unknown in gspread. Fill out this cell to continue")
+            print("The trade side for " + ticker + "at " + gspread_entries['Date'] + " is unknown in gspread. Fill out this cell to continue")
             continue
 
         # Grab the Date of the stocks that we will compute the average entry price for
