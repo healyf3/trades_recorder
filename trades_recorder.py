@@ -110,21 +110,26 @@ print(csv_df_avg_prices.to_string())
 for idx, gspread_entries in enumerate(gspread_all_values_dict):
     if gspread_entries['Entry Shares'] != gspread_entries['Exit Shares'] or gspread_entries['Entry Shares'] == "":
 
-        # Grab ticker and ticker's side from spreadsheet
-        ticker = gspread_entries['Ticker']
-        gspread_ticker_trade_side = gspread_entries['Side']
-        if gspread_ticker_trade_side == "":
-            print("The trade side for " + ticker + "at " + gspread_entries['Date'] + " is unknown in gspread. Fill out this cell to continue")
-            continue
-
         # Grab the Date of the stocks that we will compute the average entry price for
         trade_date = datetime.strptime(gspread_entries['Date'], '%m/%d/%Y')
+
+        # Grab ticker and ticker's side from spreadsheet
+        ticker = gspread_entries['Ticker']
+        if gspread_all_values_dict[idx]['Side'] == "" and trade_date == csv_file_date:
+            if broker == 'cobra':
+                gspread_all_values_dict[idx]['Side'] = 'SS'
+            elif broker == 'etrade':
+                gspread_all_values_dict[idx]['Side'] = 'B'
+            else:
+                print("Broker unknown. Skipping trade")
+                continue
+
 
         # TODO: this logic isn't correct. Need to verify the time of which the side started and compare to the other side start time
         # Right now we are just recording the trade side manually
         # # Get Side of the trade from the csv data for the given ticker
         # csv_ticker_trade_side = csv_df_share_sum[ticker].keys().values[0]
-        # if gspread_ticker_trade_side == "":
+        # if gspread_all_values_dict[idx]['Side'] == "":
         #     gspread_ticker_trade_side = csv_ticker_trade_side
 
         # TODO: reevaluate average pricing for adds on different days (low priority)
@@ -145,7 +150,7 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
             continue
 
         for val in csv_df_share_sum[ticker].items():
-            if val[0] == gspread_ticker_trade_side:
+            if val[0] == gspread_all_values_dict[idx]['Side']:
                 # change ticker_entry_shares to int if we haven't filled it out yet
                 if ticker_entry_shares == '':
                     ticker_entry_shares = 0
@@ -186,6 +191,7 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         gspread_all_values_dict[idx]['Last Entry Time'] = str(ticker_last_entry_datetime)
         gspread_all_values_dict[idx]['First Exit Time'] = str(ticker_first_exit_datetime)
         gspread_all_values_dict[idx]['Last Exit Time'] = str(ticker_last_exit_datetime)
+        gspread_all_values_dict[idx]['Broker'] = broker
 
         # Ideal Entry Prices and Times #
         #   1. dd1: Track the high after 10:30am for that day
