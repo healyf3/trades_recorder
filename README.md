@@ -5,13 +5,13 @@ Cobra and Etrade brokers and placing them in a google spreadsheet for analysis.*
 
 #### avg_price.py
 
-This script has been used for testing purposes. 
+This script has been used for testing purposes.
 Input a trade file and print out the average execution for each side of the trade.
 This file could probably be removed from the repository
 
 #### etrade_recorder.py
 
-This file could also be removed from the repository as it was just for testing the 
+This file could also be removed from the repository as it was just for testing the
 initial setup for etrade trade recording
 
 #### file_utilities.py
@@ -24,7 +24,7 @@ Gets broker ID according to file name
 
 *get_date()*:
 Gets date of trades from csv file name. Note that this could be optimized down
-the road for etrade trades as the file comes with the actual dates. For now, the 
+the road for etrade trades as the file comes with the actual dates. For now, the
 recorder will just have the same format as we record with cobra trades as those don't have
 the date (only time) in the csv files.
 
@@ -108,7 +108,7 @@ for each trade.
 *   % Open Gain
 
 #### trading_charts_folder_ids.py
-WIP: For each trade, gather data in polygon to form a 3 year chart, and a 2 day 
+WIP: For each trade, gather data in polygon to form a 3 year chart, and a 2 day
 chart into one picture and place in a folder so the trader can go back and review
 trades.
 
