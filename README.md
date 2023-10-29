@@ -128,3 +128,12 @@ trades.
 #### util.py
 *dbg_print()*:
 Checks static flag to decide whether or not to print to the console
+
+#### config/config.ini
+You will need to add this file into your repo
+
+Format:
+
+````
+[main]
+POLYGON_API_KEY=
