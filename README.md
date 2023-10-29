@@ -56,11 +56,24 @@ parts of the trade's day as well as it's previous day and next day
 This file will be incharge of scraping the float, market cap, and sector of each
 ticker
 
-#### service_account.json
+#### service_account.json (This file isn't provided in the remote repo. You must add it locally)
 This is the information needed to work with the gspread api. Credentials will need
 to be generated on of Google Cloud Console. The following steps are provided on
 this gspread authentication page:
 https://docs.gspread.org/en/latest/oauth2.html#enable-api-access-for-a-project
+Service account file formatting:
+You must add a service_account.json for your gspread credentials
+-{
+  "type": "",
+  "project_id": "<>",
+  "private_key_id": "<>",
+  "private_key": "-----BEGIN PRIVATE KEY-----<>",
+  "client_email": "<>",
+  "client_id": "<>",
+  "auth_uri": "<>",
+  "token_uri": "<>",
+  "auth_provider_x509_cert_url": "<>",
+  "client_x509_cert_url": "<>"
 
 #### sort_trade_times_and_export_csv.py
 This file has just been used for testing the df to csv export. Can probably be
