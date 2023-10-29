@@ -101,7 +101,7 @@ print("Average Pricing")
 print(csv_df_avg_prices.to_string())
 
 # TODO: the start of recognizing different trades from the same ticker. More logic than what its
-#for symb in csv_df.Symb.unique():
+# for symb in csv_df.Symb.unique():
 #    if csv_df.loc([symb == ''])
 #    print(symb)
 
@@ -123,7 +123,6 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
             else:
                 print("Broker unknown. Skipping trade")
                 continue
-
 
         # TODO: this logic isn't correct. Need to verify the time of which the side started and compare to the other side start time
         # Right now we are just recording the trade side manually
@@ -151,12 +150,25 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
 
         for val in csv_df_share_sum[ticker].items():
             if val[0] == gspread_all_values_dict[idx]['Side']:
-                # change ticker_entry_shares to int if we haven't filled it out yet
+                # change ticker_entry_shares and ticker_avg_entry_price to int if we haven't filled it out yet
                 if ticker_entry_shares == '':
                     ticker_entry_shares = 0
-                # Get ticker's entry shares if the side equals the entry side
-                ticker_entry_shares += val[1]
-                ticker_avg_entry_price = csv_df_avg_prices[ticker][val[0]]
+                if ticker_avg_entry_price == '':
+                    ticker_avg_entry_price = 0
+
+                # if there is already an entry price and we are adding to the position, need to re-evaluate avg price
+                prev_ticker_entry_shares = ticker_entry_shares
+                prev_avg_entry_price = ticker_avg_entry_price
+
+                current_day_entry_shares = val[1]
+                current_day_avg_entry_price = csv_df_avg_prices[ticker][val[0]]
+
+                # Get ticker's total entry shares
+                ticker_entry_shares += current_day_entry_shares
+                # Get the weighted entry incase there was already an average entry price
+                ticker_avg_entry_price = ((prev_ticker_entry_shares * prev_avg_entry_price) + (
+                        current_day_entry_shares * current_day_avg_entry_price)) / \
+                                         ticker_entry_shares
                 # assign first and last entry times
                 if ticker_first_entry_datetime == '':
                     first_entry_time = datetime.strptime(csv_df_time_min[ticker][val[0]], time_fmt)
@@ -164,12 +176,24 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                 last_entry_time = datetime.strptime(csv_df_time_max[ticker][val[0]], time_fmt)
                 ticker_last_entry_datetime = datetime.combine(trade_date, last_entry_time.time())
             else:
-                # change ticker_exit_shares to int if we haven't filled it out yet
+                # change ticker_exit_shares and ticker_avg_exit_price to int if we haven't filled it out yet
                 if ticker_exit_shares == '':
                     ticker_exit_shares = 0
-                # Get ticker's exit shares if the side is opposite the entry side
-                ticker_exit_shares += val[1]
-                ticker_avg_exit_price = csv_df_avg_prices[ticker][val[0]]
+                if ticker_avg_exit_price == '':
+                    ticker_avg_exit_price = 0
+
+                # if there is already an entry price and we are adding to the position, need to re-evaluate avg price
+                prev_ticker_exit_shares = ticker_exit_shares
+                prev_avg_exit_price = ticker_avg_exit_price
+
+                current_day_exit_shares = val[1]
+                current_day_avg_exit_price = csv_df_avg_prices[ticker][val[0]]
+
+                # Get ticker's total exit shares
+                ticker_exit_shares += current_day_exit_shares
+                ticker_avg_exit_price = ((prev_ticker_exit_shares * prev_avg_exit_price) + (
+                        current_day_exit_shares * current_day_avg_exit_price)) / \
+                                        ticker_exit_shares
                 # assign first and last exit times
                 if ticker_first_exit_datetime == '':
                     first_exit_time = datetime.strptime(csv_df_time_min[ticker][val[0]], time_fmt)
@@ -177,10 +201,8 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                 last_exit_time = datetime.strptime(csv_df_time_max[ticker][val[0]], time_fmt)
                 ticker_last_exit_datetime = datetime.combine(trade_date, last_exit_time.time())
 
-
-        #TODO: start of polygon logic
-        #df = hloc_utilities.get_intraday_ticks(ticker, trade_date)
-
+        # TODO: start of polygon logic
+        # df = hloc_utilities.get_intraday_ticks(ticker, trade_date)
 
         # Place average entry and exit, entry and exit shares, and times back in gspread_all_values_dict at the current idx
         gspread_all_values_dict[idx]['Entry Shares'] = ticker_entry_shares
@@ -227,9 +249,8 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         #       b. Ideal Entry Price
         #   Question: What if you are short and long within same period?
 
-
 # publish updated worksheet
 gspread_df = pd.DataFrame(gspread_all_values_dict)
 # remove columns that have google sheets formulas so we don't overwrite them
-gspread_df = gspread_df.loc[:,:gspread_last_raw_value_column]
+gspread_df = gspread_df.loc[:, :gspread_last_raw_value_column]
 worksheet.update([gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
