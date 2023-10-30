@@ -9,11 +9,6 @@ This script has been used for testing purposes.
 Input a trade file and print out the average execution for each side of the trade.
 This file could probably be removed from the repository
 
-#### etrade_recorder.py
-
-This file could also be removed from the repository as it was just for testing the
-initial setup for etrade trade recording
-
 #### file_utilities.py
 
 This file includes all the functions needed to decipher between etrade and cobra
@@ -76,8 +71,8 @@ You must add a service_account.json for your gspread credentials
   "client_x509_cert_url": "<>"
 
 #### sort_trade_times_and_export_csv.py
-This file has just been used for testing the df to csv export. Can probably be
-removed.
+Runs the following function from the file_utilties module:
+file_utilities.export_trades_df_to_csv(csv_df, trades_file, description='sorted')
 
 #### trades_recorder.py
 In charge of computing the following information and placing in google spreadsheet
