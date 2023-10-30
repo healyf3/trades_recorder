@@ -21,7 +21,7 @@ POLYGON_TRADES_HISTORY_RESPONSE_LIMIT = 50000
 
 
 def get_intraday_ticks(ticker, date):
-    if 'str' == type(date):
+    if not isinstance(date, datetime.datetime):
         date = datetime.datetime.strptime(date, "%Y-%m-%d")
 
     aggs = cast(
