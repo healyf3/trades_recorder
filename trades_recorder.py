@@ -124,14 +124,6 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                 print("Broker unknown. Skipping trade")
                 continue
 
-        # TODO: this logic isn't correct. Need to verify the time of which the side started and compare to the other side start time
-        # Right now we are just recording the trade side manually
-        # # Get Side of the trade from the csv data for the given ticker
-        # csv_ticker_trade_side = csv_df_share_sum[ticker].keys().values[0]
-        # if gspread_all_values_dict[idx]['Side'] == "":
-        #     gspread_ticker_trade_side = csv_ticker_trade_side
-
-        # TODO: reevaluate average pricing for adds on different days (low priority)
         ticker_entry_shares = gspread_all_values_dict[idx]['Entry Shares']
         ticker_avg_entry_price = gspread_all_values_dict[idx]['Avg Entry Price']
         ticker_exit_shares = gspread_all_values_dict[idx]['Exit Shares']
@@ -216,38 +208,12 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         gspread_all_values_dict[idx]['Broker'] = broker
 
         # Ideal Entry Prices and Times #
-        #   1. dd1: Track the high after 10:30am for that day
-        #   2. oegd: Track the high before 10:30am for that day
-        #   3. md bo: After breakout price was hit, track low starting at breakout time and before the high of day
-        #   4. vwap tank: Manually record when it drops to or below vwap. Then track the high after
-        #   5. aft bo: After breakout price was hit after 1pm, track low starting at breakout time and before high of day
-        #   6. FailSpike below Vwap Consolidate: After under Vwap for one hour, track high
-
-        # Ideal Exit Prices and Times #
-        #   1. dd1: Track the low after 10:30am between that day and next
-        #   2. oegd: Track the low for that day
-        #   3. md bo: After breakout price was hit, track high starting at breakout time for that day
-        #   4. vwap tank: Manually record when it drops to or below vwap. Track the low after until next day
-        #   5. aft bo: After breakout price was hit after 1pm, track low starting at breakout time for that day
-        #   6. FailSpike below Vwap Consolidate: After under Vwap for one hour, track low after until next day
+        # Ideal entry prices and times can be computed after market close
+        # Ideal exit times can also be computed after market close except for dd1 and aft bo strategies. These will
+        # be computed after next day's market close
 
         # Grabbing csv data:
-        #   * Search for first column where entry shares don't equal exit shares
-        #   * If exit shares are greater than entry shares, start a new trade column
-        #   * From that row, match csv ticker with google sheets ticker
-        #   * If googlesheets ticker doesn't exist after going to last row, make new row with 'B' or 'SS'.
-        #   * Add share amount
-        #   * Return Error if type is 'S' for new row
-        #   * If you found an existing row, make sure the csv type is opposite the side. Otherwise, return error
-        #   * If you are starting on a new row, you can Grab the following from the csv file:
-        #       a. First Entry Time
-        #       b. Last Entry Time
-        #   * If you are starting on a new row, you can Compute the following from the csv file:
-        #       a. Avg Entry Price
-        #   * If you are starting on a new row, you can compute the following from polygon.io:
-        #       a. Ideal Entry Time
-        #       b. Ideal Entry Price
-        #   Question: What if you are short and long within same period?
+        # Question: What if you are short and long within same period?
 
 # publish updated worksheet
 gspread_df = pd.DataFrame(gspread_all_values_dict)
