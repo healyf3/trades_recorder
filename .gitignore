@@ -3,3 +3,6 @@
 *.ini
 *.json
 sandbox.py
+*venv*
+*idea/
+__pycache__/
