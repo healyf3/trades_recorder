@@ -12,6 +12,8 @@ from urllib3 import HTTPResponse
 import json
 import pandas as pd
 
+import util
+
 # Grab TD configuration values.
 config = ConfigParser()
 config.read('config/config.ini')
@@ -362,3 +364,6 @@ def reg_market_hloc(frame, t_delta):
     hloc_d['afternoon_low_time'] = hloc_d['afternoon_low_time'] - eastern_td
 
     return hloc_d
+
+def record_hloc():
+    if gspread_all_values_dict[idx]['Side'] = 'B'

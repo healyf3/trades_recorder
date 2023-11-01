@@ -7,16 +7,16 @@ from datetime import datetime
 import re
 
 # import scrape_utilities
-import file_utilities
-import hloc_utilities
+import util
+#import hloc_utilities
 from trading_charts_folder_ids import folder_ids
 
 trades_file = sys.argv[1]
 print(trades_file)
 
 # grab broker type and file date from csv file name
-broker = file_utilities.get_broker(trades_file)
-csv_file_date = file_utilities.get_date(trades_file)
+broker = util.get_broker(trades_file)
+csv_file_date = util.get_date(trades_file)
 
 time_fmt = '%H:%M:%S'
 if 'etrade' == broker:
@@ -75,7 +75,7 @@ gspread_last_raw_value_column = '% Open Gain'
 # csv_file_date = datetime.today()
 
 # Read csv file into pandas dataframe
-csv_df = file_utilities.trades_csv_to_df(trades_file)
+csv_df = util.trades_csv_to_df(trades_file)
 
 # Group by symbol and time
 csv_df = csv_df.sort_values(['Symb', 'Time'])
@@ -111,11 +111,11 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
     if gspread_entries['Entry Shares'] != gspread_entries['Exit Shares'] or gspread_entries['Entry Shares'] == "":
 
         # Grab the Date of the stocks that we will compute the average entry price for
-        trade_date = datetime.strptime(gspread_entries['Date'], '%m/%d/%Y')
+        gspread_trade_date = datetime.strptime(gspread_entries['Date'], '%m/%d/%Y')
 
         # Grab ticker and ticker's side from spreadsheet
         ticker = gspread_entries['Ticker']
-        if gspread_all_values_dict[idx]['Side'] == "" and trade_date == csv_file_date:
+        if gspread_all_values_dict[idx]['Side'] == "" and gspread_trade_date == csv_file_date:
             if broker == 'cobra':
                 gspread_all_values_dict[idx]['Side'] = 'SS'
             elif broker == 'etrade':
@@ -137,7 +137,7 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         # If the csv file date doesn't match the gspread trade date and the gspread trade date's entry price is none, continue
         # because that's a different trade.
         if csv_df_share_sum.get(ticker) is None or \
-                ((trade_date != csv_file_date) and not ticker_entry_shares):
+                ((gspread_trade_date != csv_file_date) and not ticker_entry_shares):
             continue
 
         for val in csv_df_share_sum[ticker].items():
@@ -164,9 +164,9 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                 # assign first and last entry times
                 if ticker_first_entry_datetime == '':
                     first_entry_time = datetime.strptime(csv_df_time_min[ticker][val[0]], time_fmt)
-                    ticker_first_entry_datetime = datetime.combine(trade_date, first_entry_time.time())
+                    ticker_first_entry_datetime = datetime.combine(gspread_trade_date, first_entry_time.time())
                 last_entry_time = datetime.strptime(csv_df_time_max[ticker][val[0]], time_fmt)
-                ticker_last_entry_datetime = datetime.combine(trade_date, last_entry_time.time())
+                ticker_last_entry_datetime = datetime.combine(gspread_trade_date, last_entry_time.time())
             else:
                 # change ticker_exit_shares and ticker_avg_exit_price to int if we haven't filled it out yet
                 if ticker_exit_shares == '':
@@ -187,14 +187,15 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                         current_day_exit_shares * current_day_avg_exit_price)) / \
                                         ticker_exit_shares
                 # assign first and last exit times
+                # The exit date should be grabbed from the csv_file_date so those that are held overnight
                 if ticker_first_exit_datetime == '':
                     first_exit_time = datetime.strptime(csv_df_time_min[ticker][val[0]], time_fmt)
-                    ticker_first_exit_datetime = datetime.combine(trade_date, first_exit_time.time())
+                    ticker_first_exit_datetime = datetime.combine(csv_file_date, first_exit_time.time())
                 last_exit_time = datetime.strptime(csv_df_time_max[ticker][val[0]], time_fmt)
-                ticker_last_exit_datetime = datetime.combine(trade_date, last_exit_time.time())
+                ticker_last_exit_datetime = datetime.combine(csv_file_date, last_exit_time.time())
 
         # TODO: start of polygon logic
-        # df = hloc_utilities.get_intraday_ticks(ticker, trade_date)
+        # df = hloc_utilities.get_intraday_ticks(ticker, gspread_trade_date)
 
         # Place average entry and exit, entry and exit shares, and times back in gspread_all_values_dict at the current idx
         gspread_all_values_dict[idx]['Entry Shares'] = ticker_entry_shares
