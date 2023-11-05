@@ -9,23 +9,25 @@ import gspread
 # TODO: move constants to a more centralized location
 DBG_PRINT = False
 spreadsheet_name = "Trades"
+
+
 def dbg_print(str):
     if (DBG_PRINT):
         print(str)
 
-def get_gspread_worksheet_values(trades_file):
+
+def get_gspread_worksheet(spreadsheet_name):
     # Setup Google Sheets Connection
     gc = gspread.service_account()
     sh = gc.open(spreadsheet_name)
     # Params
-    worksheet = sh.worksheet(spreadsheet_name)
-    # worksheet = sh.worksheet("TradesTest") # testcase
+    return sh.worksheet(spreadsheet_name)
 
+
+def get_gspread_worksheet_values(worksheet):
     # Get all values from the worksheet and store in a dictionary and search for data that way. This reduces the amount
     # of API calls since there is a limit of 300 requests per minute per project and 60 requests per minute per user
-    gspread_all_values_dict = worksheet.get_all_records()
-
-    return gspread_all_values_dict
+    return worksheet.get_all_records()
 
 
 # These functions use the csv naming convention of <broker>-<date>_<optional_description>.csv
@@ -75,12 +77,12 @@ def trades_csv_to_df(trades_file):
                 # csv_df_list[3] -> Qty
                 # csv_df_list[4] -> Symb
                 # csv_df_list[5] -> Price
-                if 'Buy' == ll[3]: ll[3] = 'B' # So it's consistent with Cobra's naming convention
-                if 'Sell' == ll[3]: ll[3] = 'S' # So it's consistent with Cobra's naming convention
+                if 'Buy' == ll[3]: ll[3] = 'B'  # So it's consistent with Cobra's naming convention
+                if 'Sell' == ll[3]: ll[3] = 'S'  # So it's consistent with Cobra's naming convention
 
                 # For option trades
                 if 'Call' in ll or 'Put' in ll:
-                    ll[4] = 100*int(ll[4])
+                    ll[4] = 100 * int(ll[4])
                 csv_df_list = [ll[0], ll[1], ll[3], int(ll[4]), ll[5], float(ll[-1])]
                 csv_df.loc[len(csv_df)] = csv_df_list
 
@@ -97,8 +99,8 @@ def export_trades_df_to_csv(df, trades_file, description):
     csv_idx = trades_file.index(".csv")
     df.to_csv(trades_file[:csv_idx] + '_' + description + '.csv', index=False)
 
-def convert24(str1):
 
+def convert24(str1):
     # Checking if last two elements of time
     # is AM and first two elements are 12
     if str1[-2:] == "AM" and str1[:2] == "12":
