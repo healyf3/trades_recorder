@@ -1,4 +1,5 @@
 import datetime
+from datetime import timedelta
 import gspread
 from grab_holiday_dates import grab_holidays_from_csv
 import requests
@@ -21,6 +22,64 @@ polygon_api_key = config.get('main', 'POLYGON_API_KEY')
 polygon_client = plygRESTC(polygon_api_key)
 POLYGON_TRADES_HISTORY_RESPONSE_LIMIT = 50000
 
+def get_intraday_data(ticker, date, strategy_name):
+
+    data_dict = dict()
+    # Grab the historical prices
+    # Ts in nanoseconds specifically for polygon
+    start_dt = datetime.strptime(date, '%m-%d-%Y')
+    # The Date starts at 12am and goes through the next day to 8pm (aftermarket hours)
+    end_dt = start_dt + timedelta(days=1, hours=20)
+    prev_dt = start_dt - timedelta(days=1)
+    # TODO: The script can probably do without checking the weekends or holidays. Just go back at most 4 days and if
+    # the 4 day doesn't give any data then print a message and continue to the next ticker
+    #end_dt, holiday_weekend_next_t_delta = set_correct_date_if_holiday_or_weekend(end_dt, 'next')
+    #prev_dt, _ = set_correct_date_if_holiday_or_weekend(prev_dt, 'prev')
+    next_day_t_delta = timedelta(days=1)
+    #next_day_t_delta = next_day_t_delta + holiday_weekend_next_t_delta
+
+    aggs = cast(
+        HTTPResponse,
+        polygon_client.get_aggs(ticker, 1, "minute", start_dt, end_dt, raw=True),
+    )
+
+    ddict = json.loads(aggs.data.decode("utf-8"))
+    tick_df = pd.DataFrame(ddict['results'])
+
+    # grab previous close
+    prev_aggs = cast(
+        HTTPResponse,
+        polygon_client.get_aggs(ticker, 1, "day", prev_dt.date(), prev_dt.date(), raw=True),
+    )
+
+    prev_ddict = json.loads(prev_aggs.data.decode("utf-8"))
+    prev_tick_df = pd.DataFrame(prev_ddict['results'])
+    data_dict['previous_close'] = prev_tick_df['c'][0]
+
+    reg_mkt_data_d = reg_market_hloc(tick_df, t_delta=timedelta())
+    pre_mkt_data_d = pre_market_hloc(tick_df, t_delta=timedelta())
+    data_dict = data_dict | reg_mkt_data_d | pre_mkt_data_d
+
+
+    # grab next pre-market data
+    next_pre_mkt_data_d = pre_market_hloc(tick_df, t_delta=next_day_t_delta)
+    next_pre_mkt_data_d = {"next" + '_' + k: v for k, v in next_pre_mkt_data_d.items()}
+    data_dict = data_dict | next_pre_mkt_data_d
+
+    # grab next reg market data
+    next_reg_mkt_data_d = reg_market_hloc(tick_df, t_delta=next_day_t_delta)
+    next_reg_mkt_data_d = {"next_day" + '_' + k: v for k, v in next_reg_mkt_data_d.items()}
+    data_dict = data_dict | next_reg_mkt_data_d
+
+    # TODO: upload chart to google drive
+    #image = graph_stock.plot_intraday(tick_df, ticker, date, strategy_name)
+    #gfile = drive.CreateFile({'parents': [{'id': folder_ids[strategy_name]}]})
+    ## Read file and set it as the content of this instance.
+    #gfile.SetContentFile(image)
+    #gfile.Upload()  # Upload the file.
+
+
+    return data_dict
 
 def get_intraday_ticks(ticker, date):
     if not isinstance(date, datetime.datetime):
@@ -97,13 +156,6 @@ def get_daily_volume_count():
 def get_premarket_volume_count():
     return
 
-
-def setup_gspread_worksheet_connection(spreadsheet_name, worksheet_name):
-    gc = gspread.service_account()
-    sh = gc.open(spreadsheet_name)
-    return sh.worksheet(worksheet_name)
-
-
 def grab_gspread_tickers_to_backtest(worksheet, empty_start_column_idx):
     # Grab next row to fill. (We start filling data out in the empty start column)
     float_list = list(filter(None, worksheet.col_values(empty_start_column_idx)))
@@ -132,88 +184,6 @@ def get_gspread_all_tickers(worksheet):
     rows = list(range(0, len(ticker_list)))
     tickers = list(zip(ticker_list, date_list, rows))
     return tickers[1:]
-
-
-def get_sector_info(url):
-    html = requests.get(url).text
-    soup = BeautifulSoup(html, 'html.parser')
-    sector_label = soup.find("span", text="Sector")
-    sector = 'N/A'
-    industry = 'N/A'
-    try:
-        sector = sector_label.next_sibling.next_sibling.getText()
-        industry_label = soup.find("span", text="Industry")
-        industry = industry_label.next_sibling.next_sibling.getText()
-        # remove \t, \n, etc.
-        sector = sector.strip()
-        industry = industry.strip()
-    except:
-        print('sector not found')
-
-    return sector, industry
-    # test
-    # return "na", "na"
-
-
-def get_float_sector_info(ticker):
-    floatchecker_url = 'https://www.floatchecker.com/stock?float='
-    floatchecker_url = floatchecker_url + ticker
-    html = requests.get(floatchecker_url).text
-    soup = BeautifulSoup(html, 'html.parser')
-    regex_list = [re.compile('Morningstar.'), re.compile('FinViz'), re.compile('Yahoo Finance'),
-                  re.compile('Wall Street Journal')]
-    info_dict = {}
-    l = [None] * 5
-    grab_sector = True
-    # while the float is unavailable, search in the next regex
-    i = 0
-    while l[2] is None and i < len(regex_list):
-        j = 0
-        num = [None] * 3  # list for float, short interest, and outstanding shares
-        for link in soup.find_all('a'):
-            title = link.get('title')
-            if re.match(regex_list[i], str(title)):
-                # only grab sector once
-                if grab_sector:
-                    sector, industry = get_sector_info(link.get('href'))
-                    l[0] = sector
-                    l[1] = industry
-                    grab_sector = False
-
-                num[j] = re.findall('\d*\.?\d+', link.getText())
-                # If the float is available for the regex column then we will try to grab short interest and oustanding shares too.
-                # If not, then we will move to the next regex
-                if not num[0]:
-                    j = 0
-                    break
-
-                if num[j]:
-                    l[j + 2] = num[j][0]
-                j = j + 1
-        i = i + 1
-
-    info_dict['sector'] = 'N/A'
-    info_dict['industry'] = 'N/A'
-    info_dict['float'] = 'N/A'
-    info_dict['short interest'] = 'N/A'
-    info_dict['shares outstanding'] = 'N/A'
-
-    info_dict['sector'] = l[0]
-    info_dict['industry'] = l[1]
-    if l[2] is not None:
-        info_dict['float'] = float(l[2]) * 1000000
-    else:
-        info_dict['float'] = 'N/A'
-    if l[3] is not None:
-        info_dict['short interest'] = float(l[3]) / 100
-    else:
-        info_dict['short interest'] = 'N/A'
-    if l[4] is not None:
-        info_dict['shares outstanding'] = float(l[4]) * 1000000
-    else:
-        info_dict['short interest'] = 'N/A'
-
-    return info_dict
 
 
 def hloc(frame, time_frame, t_delta, eastern_td):
@@ -282,10 +252,10 @@ def pre_market_hloc(frame, t_delta):
     local_frame = frame.copy()
     if is_dst(datetime.datetime.fromtimestamp(local_frame['t'][0] / 1000) + t_delta, pytz.timezone("US/Eastern")):
         eastern_td = datetime.timedelta(hours=4)
-        hloc_d = hloc(frame, time_frame=['8:00:00', '13:29:00'], t_delta=t_delta, eastern_td=eastern_td)
+        hloc_d = hloc(frame, time_frame=['8:00:00', '13:29:59'], t_delta=t_delta, eastern_td=eastern_td)
     else:
         eastern_td = datetime.timedelta(hours=5)
-        hloc_d = hloc(frame, time_frame=['9:00:00', '14:29:00'], t_delta=t_delta, eastern_td=eastern_td)
+        hloc_d = hloc(frame, time_frame=['9:00:00', '14:29:59'], t_delta=t_delta, eastern_td=eastern_td)
 
     hloc_d = {"pre_mkt" + '_' + k: v for k, v in hloc_d.items()}
     return hloc_d

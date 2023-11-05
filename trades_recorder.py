@@ -191,6 +191,21 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                 last_exit_time = datetime.strptime(csv_df_time_max[ticker][val[0]], time_fmt)
                 ticker_last_exit_datetime = datetime.combine(csv_file_date, last_exit_time.time())
 
+                # TODO: grab float info
+                #float_sector_info_dict = util.get_float_sector_info(ticker)
+
+                ## I'm rounding the market cap with the afternoon high for now
+                #if float_sector_info_dict['shares outstanding'] != 'N/A':
+                #    data_dict['mktCap'] = data_dict['afternoon_high'] * float_sector_info_dict['shares outstanding']
+                #else:
+                #    data_dict['mktCap'] = 'N/A'
+                #data_dict['float'] = float_sector_info_dict['float']
+                #data_dict['short interest'] = float_sector_info_dict['short interest']
+                #data_dict['sector'] = float_sector_info_dict['sector']
+                #data_dict['industry'] = float_sector_info_dict['industry']
+
+                #data_dict['google_chart_link'] = gfile.get('alternateLink')
+
         # Place average entry and exit, entry and exit shares, and times back in gspread_all_values_dict at the current idx
         gspread_all_values_dict[idx]['Entry Shares'] = ticker_entry_shares
         gspread_all_values_dict[idx]['Avg Entry Price'] = ticker_avg_entry_price
