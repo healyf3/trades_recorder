@@ -5,14 +5,17 @@ import pandas as pd
 import gspread
 from datetime import datetime
 import re
+from configparser import ConfigParser
 
 # import scrape_utilities
 import util
-#import hloc_utilities
 from trading_charts_folder_ids import folder_ids
 
 trades_file = sys.argv[1]
 print(trades_file)
+
+config_object = ConfigParser()
+config_object.read("config/config.ini")
 
 # grab broker type and file date from csv file name
 broker = util.get_broker(trades_file)
@@ -22,16 +25,10 @@ time_fmt = '%H:%M:%S'
 if 'etrade' == broker:
     time_fmt = '%H:%M'
 
-# Setup Google Sheets Connection
-gc = gspread.service_account()
-sh = gc.open("Trades")
-# Params
-worksheet = sh.worksheet("Trades")
-# worksheet = sh.worksheet("TradesTest") # testcase
 
-# Get all values from the worksheet and store in a dictionary and search for data that way. This reduces the amount
-# of API calls since there is a limit of 300 requests per minute per project and 60 requests per minute per user
-gspread_all_values_dict = worksheet.get_all_records()
+worksheet = util.get_gspread_worksheet(config_object['main']['GSPREAD_WORKSHEET'])
+
+gspread_all_values_dict = util.get_gspread_worksheet_values(worksheet)
 
 # Current Spreadsheet Info
 #   Date
@@ -193,9 +190,6 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                     ticker_first_exit_datetime = datetime.combine(csv_file_date, first_exit_time.time())
                 last_exit_time = datetime.strptime(csv_df_time_max[ticker][val[0]], time_fmt)
                 ticker_last_exit_datetime = datetime.combine(csv_file_date, last_exit_time.time())
-
-        # TODO: start of polygon logic
-        # df = hloc_utilities.get_intraday_ticks(ticker, gspread_trade_date)
 
         # Place average entry and exit, entry and exit shares, and times back in gspread_all_values_dict at the current idx
         gspread_all_values_dict[idx]['Entry Shares'] = ticker_entry_shares

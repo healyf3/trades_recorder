@@ -132,3 +132,9 @@ Format:
 ````
 [main]
 POLYGON_API_KEY=
+GSPREAD_WORKSHEET=
+````
+
+
+#### hloc_recorder.py
+Grabs all hloc information from the day of the trades to the next day
