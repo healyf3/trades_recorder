@@ -119,6 +119,8 @@ for each trade.
 *   Float
 *   Market Cap
 *   Sector
+*   Industry
+*   Exchange
 *   % Open Gain
 
 #### trading_charts_folder_ids.py
@@ -129,6 +131,9 @@ trades.
 #### util.py
 *dbg_print()*:
 Checks static flag to enable print statements
+
+*grab_finviz_fundamentals()*:
+Uses the finviz python library to grab float, market cap, sector, industry, and exchange
 
 #### config/config.ini
 You will need to add this file into your repo

@@ -26,7 +26,8 @@ if 'etrade' == broker:
     time_fmt = '%H:%M'
 
 
-worksheet = util.get_gspread_worksheet(config_object['main']['GSPREAD_WORKSHEET'])
+worksheet = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'],config_object['main']['GSPREAD_WORKSHEET'])
+worksheet_test = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'], 'ttest')
 
 gspread_all_values_dict = util.get_gspread_worksheet_values(worksheet)
 
@@ -67,6 +68,7 @@ gspread_all_values_dict = util.get_gspread_worksheet_values(worksheet)
 #   Sector
 #   % Open Gain
 gspread_last_raw_value_column = '% Open Gain'
+gspread_first_auto_entry = 'Broker'
 
 # TODO: this will probably be an etrade specific variable if we are grabbing from the etrade website trade document
 # csv_file_date = datetime.today()
@@ -136,6 +138,9 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         if csv_df_share_sum.get(ticker) is None or \
                 ((gspread_trade_date != csv_file_date) and not ticker_entry_shares):
             continue
+
+        # Get fundamental data
+        fundamentals_dict = util.grab_finviz_fundamentals(ticker)
 
         for val in csv_df_share_sum[ticker].items():
             if val[0] == gspread_all_values_dict[idx]['Side']:
@@ -216,6 +221,11 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         gspread_all_values_dict[idx]['First Exit Time'] = str(ticker_first_exit_datetime)
         gspread_all_values_dict[idx]['Last Exit Time'] = str(ticker_last_exit_datetime)
         gspread_all_values_dict[idx]['Broker'] = broker
+        gspread_all_values_dict[idx]['Float'] = fundamentals_dict['Float']
+        gspread_all_values_dict[idx]['Market Cap'] = fundamentals_dict['Market Cap']
+        gspread_all_values_dict[idx]['Sector'] = fundamentals_dict['Sector']
+        gspread_all_values_dict[idx]['Industry'] = fundamentals_dict['Industry']
+        gspread_all_values_dict[idx]['Exchange'] = fundamentals_dict['Exchange']
 
         # Ideal Entry Prices and Times #
         # Ideal entry prices and times can be computed after market close
@@ -229,4 +239,6 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
 gspread_df = pd.DataFrame(gspread_all_values_dict)
 # remove columns that have google sheets formulas so we don't overwrite them
 gspread_df = gspread_df.loc[:, :gspread_last_raw_value_column]
+#gspread_df = gspread_df.loc[:, :gspread_last_raw_value_column]
 worksheet.update([gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
+#worksheet_test.update('Q1:BD179',[gspread_df.columns.values.tolist()] + gspread_df.values.tolist())

@@ -156,35 +156,6 @@ def get_daily_volume_count():
 def get_premarket_volume_count():
     return
 
-def grab_gspread_tickers_to_backtest(worksheet, empty_start_column_idx):
-    # Grab next row to fill. (We start filling data out in the empty start column)
-    float_list = list(filter(None, worksheet.col_values(empty_start_column_idx)))
-    empty_row = (len(float_list) + 1)
-
-    # Grab remaining tickers
-    date_list = list(filter(None, worksheet.col_values(1)))
-    last_date_row = len(date_list)
-    ticker_list = list(filter(None, worksheet.col_values(2)))
-
-    date_list = date_list[empty_row - 1:last_date_row]
-    ticker_list = ticker_list[empty_row - 1:last_date_row]
-
-    rows = list(range(empty_row, last_date_row + 1))
-
-    tickers = list(zip(date_list, ticker_list, rows))
-    # tickers = list(zip(date_list, ticker_list, list(range(100))))
-
-    return tickers
-    # return tickers[1:]
-
-
-def get_gspread_all_tickers(worksheet):
-    ticker_list = list(filter(None, worksheet.col_values(1)))
-    date_list = list(filter(None, worksheet.col_values(2)))
-    rows = list(range(0, len(ticker_list)))
-    tickers = list(zip(ticker_list, date_list, rows))
-    return tickers[1:]
-
 
 def hloc(frame, time_frame, t_delta, eastern_td):
     """ Returns:
