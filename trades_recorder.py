@@ -7,8 +7,8 @@ from datetime import datetime
 import re
 from configparser import ConfigParser
 
-# import scrape_utilities
 import util
+import hloc_utilities
 from trading_charts_folder_ids import folder_ids
 
 trades_file = sys.argv[1]
@@ -105,16 +105,32 @@ print(csv_df_avg_prices.to_string())
 #    print(symb)
 
 
-# Find first exit shares cell that doesn't equal entry shares cell
 for idx, gspread_entries in enumerate(gspread_all_values_dict):
-    if gspread_entries['Entry Shares'] != gspread_entries['Exit Shares'] or gspread_entries['Entry Shares'] == "":
 
-        # Grab the Date of the stocks that we will compute the average entry price for
-        gspread_trade_date = datetime.strptime(gspread_entries['Date'], '%m/%d/%Y')
+    ticker = gspread_entries['Ticker']
+    # Grab the Date of the stocks that we will compute the average entry price for
+    gspread_trade_date = datetime.strptime(gspread_entries['Date'], '%m/%d/%Y')
+    strategy = gspread_entries['Strategy']
+
+    # Grab hloc info
+    #hloc_dict = hloc_utilities.get_intraday_data(ticker, gspread_trade_date, strategy)
+
+    #gspread_all_values_dict[idx]['High'] = hloc_dict['high']
+    #gspread_all_values_dict[idx]['Low'] = hloc_dict['low']
+    #gspread_all_values_dict[idx]['Open'] = hloc_dict['open']
+    #gspread_all_values_dict[idx]['Close'] = hloc_dict['close']
+    #gspread_all_values_dict[idx]['Next High'] = hloc_dict['next_day_high']
+    #gspread_all_values_dict[idx]['Next Low'] = hloc_dict['next_day_low']
+    #gspread_all_values_dict[idx]['Next Open'] = hloc_dict['next_day_open']
+    #gspread_all_values_dict[idx]['Next Close'] = hloc_dict['next_day_close']
+
+
+    # Find first exit shares cell that doesn't equal entry shares cell
+    if gspread_trade_date == csv_file_date and (gspread_entries['Entry Shares'] != gspread_entries['Exit Shares'] or gspread_entries['Entry Shares'] == ""):
+
 
         # Grab ticker and ticker's side from spreadsheet
-        ticker = gspread_entries['Ticker']
-        if gspread_all_values_dict[idx]['Side'] == "" and gspread_trade_date == csv_file_date:
+        if gspread_all_values_dict[idx]['Side'] == "":
             if broker == 'cobra':
                 gspread_all_values_dict[idx]['Side'] = 'SS'
             elif broker == 'etrade':
@@ -122,6 +138,9 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
             else:
                 print("Broker unknown. Skipping trade")
                 continue
+
+
+
 
         ticker_entry_shares = gspread_all_values_dict[idx]['Entry Shares']
         ticker_avg_entry_price = gspread_all_values_dict[idx]['Avg Entry Price']
