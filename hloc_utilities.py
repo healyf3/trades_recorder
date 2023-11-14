@@ -12,6 +12,7 @@ from typing import cast
 from urllib3 import HTTPResponse
 import json
 import pandas as pd
+from pandas.tseries.holiday import USFederalHolidayCalendar as fh
 
 import util
 
@@ -22,21 +23,20 @@ polygon_api_key = config.get('main', 'POLYGON_API_KEY')
 polygon_client = plygRESTC(polygon_api_key)
 POLYGON_TRADES_HISTORY_RESPONSE_LIMIT = 50000
 
-def get_intraday_data(ticker, date, strategy_name):
+def get_intraday_data(ticker, start_dt, strategy_name):
 
     data_dict = dict()
     # Grab the historical prices
     # Ts in nanoseconds specifically for polygon
-    start_dt = datetime.strptime(date, '%m-%d-%Y')
     # The Date starts at 12am and goes through the next day to 8pm (aftermarket hours)
     end_dt = start_dt + timedelta(days=1, hours=20)
     prev_dt = start_dt - timedelta(days=1)
     # TODO: The script can probably do without checking the weekends or holidays. Just go back at most 4 days and if
     # the 4 day doesn't give any data then print a message and continue to the next ticker
-    #end_dt, holiday_weekend_next_t_delta = set_correct_date_if_holiday_or_weekend(end_dt, 'next')
-    #prev_dt, _ = set_correct_date_if_holiday_or_weekend(prev_dt, 'prev')
+    end_dt, holiday_weekend_next_t_delta = set_correct_date_if_holiday_or_weekend(end_dt, 'next')
+    prev_dt, _ = set_correct_date_if_holiday_or_weekend(prev_dt, 'prev')
     next_day_t_delta = timedelta(days=1)
-    #next_day_t_delta = next_day_t_delta + holiday_weekend_next_t_delta
+    next_day_t_delta = next_day_t_delta + holiday_weekend_next_t_delta
 
     aggs = cast(
         HTTPResponse,
@@ -115,7 +115,6 @@ def set_correct_date_if_the_weekend(dt, t_delta):
 
     return is_a_weekend, dt, t_delta
 
-
 def is_next_prev_a_holiday(dt, next_or_prev_day, t_delta):
     holidays = grab_holidays_from_csv()
     is_a_holiday = False
@@ -131,6 +130,7 @@ def is_next_prev_a_holiday(dt, next_or_prev_day, t_delta):
             print('neither next or prev day for holiday filter')
 
     return is_a_holiday, dt, t_delta
+
 
 
 def set_correct_date_if_holiday_or_weekend(dt, next_or_prev_day):
@@ -306,5 +306,5 @@ def reg_market_hloc(frame, t_delta):
 
     return hloc_d
 
-def record_hloc():
-    if gspread_all_values_dict[idx]['Side'] = 'B'
+#def record_hloc():
+#    if gspread_all_values_dict[idx]['Side'] == 'B'
