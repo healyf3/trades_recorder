@@ -10,19 +10,20 @@ polygon_key = config.get('main', 'POLYGON_API_KEY')
 # https://requests.readthedocs.io/en/master/user/advanced/#session-objects
 def get_holidays_from_polygon():
     holidays = []
-    with RESTClient(polygon_key) as client:
-        resp = client.reference_market_holidays()
-        for date in resp.marketholiday:
-            holidays.append(date.date)
+    polygon_client = RESTClient(polygon_key)
+    resp = polygon_client.get_market_holidays()
 
-        with open('holidays.csv', 'a+', newline='') as f_object:
-            # Pass the CSV  file object to the writer() function
-            writer_object = writer(f_object)
-            # Result - a writer object
-            # Pass the data in the list as an argument into the writerow() function
-            writer_object.writerow(holidays)
-            # Close the file object
-            f_object.close()
+    for date in resp:
+        holidays.append(date.date)
+
+    with open('holidays.csv', 'a+', newline='') as f_object:
+        # Pass the CSV  file object to the writer() function
+        writer_object = writer(f_object)
+        # Result - a writer object
+        # Pass the data in the list as an argument into the writerow() function
+        writer_object.writerow(holidays)
+        # Close the file object
+        f_object.close()
 
 def grab_holidays_from_csv():
     file = open("holidays.csv", "r")
