@@ -12,9 +12,24 @@ from typing import cast
 from urllib3 import HTTPResponse
 import json
 import pandas as pd
+import pandas_ta
 from pandas.tseries.holiday import USFederalHolidayCalendar as fh
 
 import util
+
+def get_daily_ticks(ticker, years, end_date):
+    end_date_dt = datetime.datetime.strptime(end_date, '%Y-%m-%d')
+    start_date_dt = datetime.datetime(year=end_date_dt.year-years, month=end_date_dt.month, day=end_date_dt.day)
+
+    aggs = cast(
+        HTTPResponse,
+        polygon_client.get_aggs(ticker, 1, "day", start_date_dt, end_date_dt, raw=True),
+    )
+
+    ddict = json.loads(aggs.data.decode("utf-8"))
+    tick_df = pd.DataFrame(ddict['results'])
+
+    return tick_df
 
 # Grab TD configuration values.
 config = ConfigParser()
@@ -81,13 +96,15 @@ def get_intraday_data(ticker, start_dt, strategy_name):
 
     return data_dict
 
-def get_intraday_ticks(ticker, date):
-    if not isinstance(date, datetime.datetime):
-        date = datetime.datetime.strptime(date, "%Y-%m-%d")
+def get_intraday_ticks(ticker, start_date, end_date):
+    if not isinstance(start_date, datetime.datetime):
+        start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    if not isinstance(end_date, datetime.datetime):
+        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
 
     aggs = cast(
         HTTPResponse,
-        polygon_client.get_aggs(ticker, 1, "minute", date.date(), date.date(), raw=True),
+        polygon_client.get_aggs(ticker, 1, "minute", start_date.date(), end_date.date(), raw=True),
     )
 
     ddict = json.loads(aggs.data.decode("utf-8"))

@@ -78,6 +78,7 @@ This is the information needed to work with the gspread api. Credentials will ne
 to be generated on of Google Cloud Console. The following steps are provided on
 this gspread authentication page:
 https://docs.gspread.org/en/latest/oauth2.html#enable-api-access-for-a-project
+You need to add the file to: ~/.config/gspread/
 Service account file formatting:
 You must add a service_account.json for your gspread credentials
 -{

@@ -1,4 +1,7 @@
+graphs/
+test*
 *.csv
+!holidays.csv
 *.un~
 *.ini
 *.json

@@ -68,7 +68,7 @@ gspread_all_values_dict = util.get_gspread_worksheet_values(worksheet)
 #   Sector
 #   % Open Gain
 gspread_last_raw_value_column = '% Open Gain'
-gspread_first_auto_entry = 'Broker'
+gspread_first_auto_entry_column = 'Broker'
 
 # TODO: this will probably be an etrade specific variable if we are grabbing from the etrade website trade document
 # csv_file_date = datetime.today()
@@ -112,21 +112,8 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
     gspread_trade_date = datetime.strptime(gspread_entries['Date'], '%m/%d/%Y')
     strategy = gspread_entries['Strategy']
 
-    # Grab hloc info
-    #hloc_dict = hloc_utilities.get_intraday_data(ticker, gspread_trade_date, strategy)
-
-    #gspread_all_values_dict[idx]['High'] = hloc_dict['high']
-    #gspread_all_values_dict[idx]['Low'] = hloc_dict['low']
-    #gspread_all_values_dict[idx]['Open'] = hloc_dict['open']
-    #gspread_all_values_dict[idx]['Close'] = hloc_dict['close']
-    #gspread_all_values_dict[idx]['Next High'] = hloc_dict['next_day_high']
-    #gspread_all_values_dict[idx]['Next Low'] = hloc_dict['next_day_low']
-    #gspread_all_values_dict[idx]['Next Open'] = hloc_dict['next_day_open']
-    #gspread_all_values_dict[idx]['Next Close'] = hloc_dict['next_day_close']
-
-
     # Find first exit shares cell that doesn't equal entry shares cell
-    if gspread_trade_date == csv_file_date and (gspread_entries['Entry Shares'] != gspread_entries['Exit Shares'] or gspread_entries['Entry Shares'] == ""):
+    if gspread_entries['Entry Shares'] != gspread_entries['Exit Shares'] or gspread_entries['Entry Shares'] == "":
 
 
         # Grab ticker and ticker's side from spreadsheet
@@ -257,7 +244,11 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
 # publish updated worksheet
 gspread_df = pd.DataFrame(gspread_all_values_dict)
 # remove columns that have google sheets formulas so we don't overwrite them
-gspread_df = gspread_df.loc[:, :gspread_last_raw_value_column]
 #gspread_df = gspread_df.loc[:, :gspread_last_raw_value_column]
-worksheet.update([gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
-#worksheet_test.update('Q1:BD179',[gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
+# select column range to write to
+gspread_df = gspread_df.loc[:,gspread_first_auto_entry_column: gspread_last_raw_value_column]
+gspread_first_auto_entry_column_idx = worksheet.find(gspread_first_auto_entry_column)
+gspread_last_raw_value_column_idx = worksheet.find(gspread_last_raw_value_column)
+#worksheet.update([gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
+worksheet.update(gspread_first_auto_entry_column_idx.address + ':' + gspread_last_raw_value_column_idx.address[0:-1]+str(len(gspread_all_values_dict)+1),
+                      [gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
