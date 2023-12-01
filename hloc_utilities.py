@@ -71,9 +71,9 @@ def get_intraday_data(ticker, start_dt, strategy_name):
     prev_tick_df = pd.DataFrame(prev_ddict['results'])
     data_dict['previous_close'] = prev_tick_df['c'][0]
 
-    reg_mkt_data_d = reg_market_hloc(tick_df, t_delta=timedelta())
+    whole_day_data_d = whole_day_hloc(tick_df, t_delta=timedelta())
     pre_mkt_data_d = pre_market_hloc(tick_df, t_delta=timedelta())
-    data_dict = data_dict | reg_mkt_data_d | pre_mkt_data_d
+    data_dict = data_dict | whole_day_data_d | pre_mkt_data_d
 
 
     # grab next pre-market data
@@ -81,10 +81,10 @@ def get_intraday_data(ticker, start_dt, strategy_name):
     next_pre_mkt_data_d = {"next" + '_' + k: v for k, v in next_pre_mkt_data_d.items()}
     data_dict = data_dict | next_pre_mkt_data_d
 
-    # grab next reg market data
-    next_reg_mkt_data_d = reg_market_hloc(tick_df, t_delta=next_day_t_delta)
-    next_reg_mkt_data_d = {"next_day" + '_' + k: v for k, v in next_reg_mkt_data_d.items()}
-    data_dict = data_dict | next_reg_mkt_data_d
+    # grab next day market data
+    next_day_mkt_data_d  = whole_day_hloc(tick_df, t_delta=next_day_t_delta)
+    next_day_mkt_data_d = {"next_day" + '_' + k: v for k, v in next_day_mkt_data_d.items()}
+    data_dict = data_dict | next_day_mkt_data_d
 
     # TODO: upload chart to google drive
     #image = graph_stock.plot_intraday(tick_df, ticker, date, strategy_name)
@@ -246,6 +246,83 @@ def pre_market_hloc(frame, t_delta):
         hloc_d = hloc(frame, time_frame=['9:00:00', '14:29:59'], t_delta=t_delta, eastern_td=eastern_td)
 
     hloc_d = {"pre_mkt" + '_' + k: v for k, v in hloc_d.items()}
+    return hloc_d
+def whole_day_hloc(frame, t_delta):
+    """ Returns:
+    1. High
+    2. Low
+    3. Open
+    4. Close
+    5. High Time
+    6. Low Time
+    8. Regular Hours Morning Volume
+    9. Regular Hours Afternoon Volume
+    10. Total Volume
+    11. Morning High
+    12. Morning Low
+    13. Afternoon High
+    14. Afternoon Low
+    15. Morning High Time
+    15. Morning Low Time
+    15. Afternoon High Time
+    15. Afternoon Low Time
+    """
+    local_frame = frame.copy()
+    # check for daylight savings time
+    # if utilities.is_dst(self._frame['datetime'][0].date()+t_delta,pytz.timezone("US/Eastern")):
+    if is_dst(datetime.datetime.fromtimestamp(local_frame['t'][0] / 1000) + t_delta, pytz.timezone("US/Eastern")):
+        time_frame = ['8:00:00', '13:30:00', '16:00:00', '19:59:00', '23:59:00']
+        eastern_td = datetime.timedelta(hours=4)
+    else:
+        time_frame = ['9:00:00', '14:30:00', '17:00:00', '20:59:00', '00:59:00']
+        eastern_td = datetime.timedelta(hours=5)
+
+    hloc_d = hloc(local_frame, time_frame, t_delta, eastern_td)
+    # morning_df = hloc_d['df'][time_frame[0]:time_frame[1]]
+
+    # unix time units
+    dt_afternoon = str(hloc_d['df'].index[0].date()) + ' ' + time_frame[2]
+    # date_format_str = '%Y-%m-%d %H:%M:%S'
+
+    # make sure the date index exists. If it doesn't this means there wasn't any volume in that period so
+    # we will go to the next minute
+    # convert afternoon time_frame string into timedelta object incase we need to search for the next index
+    afternoon_time_frame_td = datetime.datetime.strptime(time_frame[2], "%H:%M:%S")
+    m = 1
+    while dt_afternoon not in hloc_d['df'].index:
+        incremented_time = (afternoon_time_frame_td + datetime.timedelta(minutes=m)).time()
+        dt_afternoon = str(hloc_d['df'].index[0].date()) + ' ' + str(incremented_time)
+        m = m + 1
+
+    num_idx_afternoon = hloc_d['df'].index.get_loc(dt_afternoon)
+    morning_frame = hloc_d['df'].iloc[:num_idx_afternoon]
+    afternoon_frame = hloc_d['df'].iloc[num_idx_afternoon:]
+
+    # for IPO's coming out in the afternoon
+    if morning_frame.empty:
+        hloc_d['morning_high'] = 'n/a'
+        hloc_d['morning_low'] = 'n/a'
+        hloc_d['morning_high_time'] = 'n/a'
+        hloc_d['morning_low_time'] = 'n/a'
+        hloc_d['morning_volume'] = 'n/a'
+    else:
+        hloc_d['morning_high'] = morning_frame['h'].max()
+        hloc_d['morning_low'] = morning_frame['l'].min()
+        hloc_d['morning_high_time'] = morning_frame['h'].idxmax()
+        hloc_d['morning_low_time'] = morning_frame['l'].idxmin()
+        hloc_d['morning_volume'] = int(morning_frame['v'].sum())
+        # convert to readable time
+        hloc_d['morning_high_time'] = hloc_d['morning_high_time'] - eastern_td
+        hloc_d['morning_low_time'] = hloc_d['morning_low_time'] - eastern_td
+
+    hloc_d['afternoon_high'] = afternoon_frame['h'].max()
+    hloc_d['afternoon_low'] = afternoon_frame['l'].min()
+    hloc_d['afternoon_high_time'] = afternoon_frame['h'].idxmax()
+    hloc_d['afternoon_low_time'] = afternoon_frame['l'].idxmin()
+    hloc_d['afternoon_volume'] = afternoon_frame['v'].sum()
+    hloc_d['afternoon_high_time'] = hloc_d['afternoon_high_time'] - eastern_td
+    hloc_d['afternoon_low_time'] = hloc_d['afternoon_low_time'] - eastern_td
+
     return hloc_d
 
 

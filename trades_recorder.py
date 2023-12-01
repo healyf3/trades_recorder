@@ -26,7 +26,7 @@ if 'etrade' == broker:
     time_fmt = '%H:%M'
 
 
-worksheet = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'],config_object['main']['GSPREAD_WORKSHEET'])
+worksheet = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'],config_object['main']['GSPREAD_TRADES_WORKSHEET'])
 worksheet_test = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'], 'ttest')
 
 gspread_all_values_dict = util.get_gspread_worksheet_values(worksheet)
@@ -67,8 +67,8 @@ gspread_all_values_dict = util.get_gspread_worksheet_values(worksheet)
 #   Market Cap
 #   Sector
 #   % Open Gain
-gspread_last_raw_value_column = '% Open Gain'
 gspread_first_auto_entry_column = 'Broker'
+gspread_first_hloc_column = 'Prev Close'
 
 # TODO: this will probably be an etrade specific variable if we are grabbing from the etrade website trade document
 # csv_file_date = datetime.today()
@@ -244,11 +244,11 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
 # publish updated worksheet
 gspread_df = pd.DataFrame(gspread_all_values_dict)
 # remove columns that have google sheets formulas so we don't overwrite them
-#gspread_df = gspread_df.loc[:, :gspread_last_raw_value_column]
+#gspread_df = gspread_df.loc[:, :gspread_first_hloc_column]
 # select column range to write to
-gspread_df = gspread_df.loc[:,gspread_first_auto_entry_column: gspread_last_raw_value_column]
+gspread_df = gspread_df.loc[:,gspread_first_auto_entry_column: gspread_first_hloc_column]
 gspread_first_auto_entry_column_idx = worksheet.find(gspread_first_auto_entry_column)
-gspread_last_raw_value_column_idx = worksheet.find(gspread_last_raw_value_column)
+gspread_last_raw_value_column_idx = worksheet.find(gspread_first_hloc_column)
 #worksheet.update([gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
 worksheet.update(gspread_first_auto_entry_column_idx.address + ':' + gspread_last_raw_value_column_idx.address[0:-1]+str(len(gspread_all_values_dict)+1),
                       [gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
