@@ -2,9 +2,6 @@ import datetime
 from datetime import timedelta
 import gspread
 from grab_holiday_dates import grab_holidays_from_csv
-import requests
-from bs4 import BeautifulSoup
-import re
 import pytz
 from configparser import ConfigParser
 from polygon import RESTClient as plygRESTC
@@ -12,8 +9,6 @@ from typing import cast
 from urllib3 import HTTPResponse
 import json
 import pandas as pd
-import pandas_ta
-from pandas.tseries.holiday import USFederalHolidayCalendar as fh
 
 import util
 
@@ -46,20 +41,33 @@ def get_intraday_data(ticker, start_dt, strategy_name):
     # The Date starts at 12am and goes through the next day to 8pm (aftermarket hours)
     end_dt = start_dt + timedelta(days=1, hours=20)
     prev_dt = start_dt - timedelta(days=1)
-    # TODO: The script can probably do without checking the weekends or holidays. Just go back at most 4 days and if
-    # the 4 day doesn't give any data then print a message and continue to the next ticker
-    end_dt, holiday_weekend_next_t_delta = set_correct_date_if_holiday_or_weekend(end_dt, 'next')
-    prev_dt, _ = set_correct_date_if_holiday_or_weekend(prev_dt, 'prev')
-    next_day_t_delta = timedelta(days=1)
-    next_day_t_delta = next_day_t_delta + holiday_weekend_next_t_delta
 
-    aggs = cast(
-        HTTPResponse,
-        polygon_client.get_aggs(ticker, 1, "minute", start_dt, end_dt, raw=True),
-    )
+    while True:
+        # TODO: The script can probably do without checking the weekends or holidays. Just go back at most 4 days and if
+        # the 4 day doesn't give any data then print a message and continue to the next ticker
+        end_dt, holiday_weekend_next_t_delta = set_correct_date_if_holiday_or_weekend(end_dt, 'next')
+        prev_dt, _ = set_correct_date_if_holiday_or_weekend(prev_dt, 'prev')
+        next_day_t_delta = timedelta(days=1)
+        next_day_t_delta = next_day_t_delta + holiday_weekend_next_t_delta
 
-    ddict = json.loads(aggs.data.decode("utf-8"))
-    tick_df = pd.DataFrame(ddict['results'])
+        start_end_td = end_dt - start_dt
+        aggs = cast(
+            HTTPResponse,
+            polygon_client.get_aggs(ticker, 1, "minute", start_dt, end_dt, raw=True),
+        )
+
+        ddict = json.loads(aggs.data.decode("utf-8"))
+        tick_df = pd.DataFrame(ddict['results'])
+        last_timestamp_datetime = datetime.datetime.fromtimestamp(tick_df.iloc[-1]['t']/1000)
+        # This accounts for a stock that haulted during the day. This checks to the last timestamp in the frame and
+        # verifies that it has data at 10am the next day
+        # If there are 10 days between the next day then just break. The company may have changed ticker
+        # ($AGIL went bankrupt and became AGILQ)
+        if (last_timestamp_datetime > (end_dt - timedelta(hours=10))) or ((end_dt-start_dt).days > 10):
+            break
+        end_dt = end_dt + timedelta(days=1)
+        next_day_t_delta = next_day_t_delta + timedelta(days=1)
+
 
     # grab previous close
     prev_aggs = cast(
@@ -69,7 +77,12 @@ def get_intraday_data(ticker, start_dt, strategy_name):
 
     prev_ddict = json.loads(prev_aggs.data.decode("utf-8"))
     prev_tick_df = pd.DataFrame(prev_ddict['results'])
-    data_dict['previous_close'] = prev_tick_df['c'][0]
+    data_dict['previous_close'] = float(prev_tick_df['c'][0]) # in some cases when the number is even, the type will be int64 which isn't serializable by gspread
+
+    util.dbg_print(ticker + ' at date ' + start_dt.strftime("%m/%d/%Y %H:%M:%S"))
+    if tick_df.empty:
+        print(ticker + ' df is empty for date ' + start_dt.strftime("%m/%d/%Y, %H:%M:%S"))
+        return
 
     whole_day_data_d = whole_day_hloc(tick_df, t_delta=timedelta())
     pre_mkt_data_d = pre_market_hloc(tick_df, t_delta=timedelta())
@@ -82,7 +95,7 @@ def get_intraday_data(ticker, start_dt, strategy_name):
     data_dict = data_dict | next_pre_mkt_data_d
 
     # grab next day market data
-    next_day_mkt_data_d  = whole_day_hloc(tick_df, t_delta=next_day_t_delta)
+    next_day_mkt_data_d = whole_day_hloc(tick_df, t_delta=next_day_t_delta)
     next_day_mkt_data_d = {"next_day" + '_' + k: v for k, v in next_day_mkt_data_d.items()}
     data_dict = data_dict | next_day_mkt_data_d
 
@@ -156,8 +169,8 @@ def set_correct_date_if_holiday_or_weekend(dt, next_or_prev_day):
     check_for_holiday = True
 
     while check_for_weekend or check_for_holiday:
-        check_for_holiday, dt, t_delta = set_correct_date_if_the_weekend(dt, t_delta)
-        check_for_weekend, dt, t_delta = is_next_prev_a_holiday(dt, next_or_prev_day, t_delta)
+        check_for_weekend, dt, t_delta = set_correct_date_if_the_weekend(dt, t_delta)
+        check_for_holiday, dt, t_delta = is_next_prev_a_holiday(dt, next_or_prev_day, t_delta)
 
     return dt, t_delta
 
@@ -202,6 +215,8 @@ def hloc(frame, time_frame, t_delta, eastern_td):
     dt = datetime.datetime.fromtimestamp(local_frame['t'][0] / 1000).date() + t_delta
     dt_start = str(dt) + ' ' + time_frame[0]
     dt_end = str(dt) + ' ' + time_frame[-1]
+    if time_frame[-1] == '00:59:00': # this conditional accounts for daylight savings
+        dt_end = str(dt+timedelta(days=1)) + ' ' + time_frame[-1]
     # create regular market hour frame
     local_frame['t'] = local_frame.t.apply(
         lambda x: datetime.datetime.fromtimestamp(x / 1000).astimezone(pytz.timezone('UTC')))
@@ -271,32 +286,50 @@ def whole_day_hloc(frame, t_delta):
     # check for daylight savings time
     # if utilities.is_dst(self._frame['datetime'][0].date()+t_delta,pytz.timezone("US/Eastern")):
     if is_dst(datetime.datetime.fromtimestamp(local_frame['t'][0] / 1000) + t_delta, pytz.timezone("US/Eastern")):
-        time_frame = ['8:00:00', '13:30:00', '16:00:00', '19:59:00', '23:59:00']
+        time_frame = ['8:00:00', '13:30:00', '16:00:00', '20:00:00', '23:59:00']
         eastern_td = datetime.timedelta(hours=4)
     else:
-        time_frame = ['9:00:00', '14:30:00', '17:00:00', '20:59:00', '00:59:00']
+        time_frame = ['9:00:00', '14:30:00', '17:00:00', '21:00:00', '00:59:00']
         eastern_td = datetime.timedelta(hours=5)
 
     hloc_d = hloc(local_frame, time_frame, t_delta, eastern_td)
     # morning_df = hloc_d['df'][time_frame[0]:time_frame[1]]
 
     # unix time units
-    dt_afternoon = str(hloc_d['df'].index[0].date()) + ' ' + time_frame[2]
+    dt_morning = str(hloc_d['df'].index[0].date()) + ' ' + time_frame[1] # regular mkt session
+    dt_afternoon = str(hloc_d['df'].index[0].date()) + ' ' + time_frame[2] # regular mkt session
+    dt_close = str(hloc_d['df'].index[0].date()) + ' ' + time_frame[3] # regular mkt session
     # date_format_str = '%Y-%m-%d %H:%M:%S'
 
     # make sure the date index exists. If it doesn't this means there wasn't any volume in that period so
     # we will go to the next minute
     # convert afternoon time_frame string into timedelta object incase we need to search for the next index
+    morning_time_frame_td = datetime.datetime.strptime(time_frame[1], "%H:%M:%S")
     afternoon_time_frame_td = datetime.datetime.strptime(time_frame[2], "%H:%M:%S")
+    close_time_frame_td = datetime.datetime.strptime(time_frame[3], "%H:%M:%S")
+
+    m = 1
+    while dt_morning not in hloc_d['df'].index:
+        incremented_time = (morning_time_frame_td + datetime.timedelta(minutes=m)).time()
+        dt_morning = str(hloc_d['df'].index[0].date()) + ' ' + str(incremented_time)
+        m = m + 1
     m = 1
     while dt_afternoon not in hloc_d['df'].index:
         incremented_time = (afternoon_time_frame_td + datetime.timedelta(minutes=m)).time()
         dt_afternoon = str(hloc_d['df'].index[0].date()) + ' ' + str(incremented_time)
         m = m + 1
+    m = 1
+    while dt_close not in hloc_d['df'].index:
+        incremented_time = (close_time_frame_td + datetime.timedelta(minutes=m)).time()
+        dt_close = str(hloc_d['df'].index[0].date()) + ' ' + str(incremented_time)
+        m = m + 1
 
+
+    num_idx_morning = hloc_d['df'].index.get_loc(dt_morning)
     num_idx_afternoon = hloc_d['df'].index.get_loc(dt_afternoon)
-    morning_frame = hloc_d['df'].iloc[:num_idx_afternoon]
-    afternoon_frame = hloc_d['df'].iloc[num_idx_afternoon:]
+    num_idx_close = hloc_d['df'].index.get_loc(dt_close)
+    morning_frame = hloc_d['df'].iloc[num_idx_morning:num_idx_afternoon]
+    afternoon_frame = hloc_d['df'].iloc[num_idx_afternoon:num_idx_close]
 
     # for IPO's coming out in the afternoon
     if morning_frame.empty:
@@ -315,13 +348,20 @@ def whole_day_hloc(frame, t_delta):
         hloc_d['morning_high_time'] = hloc_d['morning_high_time'] - eastern_td
         hloc_d['morning_low_time'] = hloc_d['morning_low_time'] - eastern_td
 
-    hloc_d['afternoon_high'] = afternoon_frame['h'].max()
-    hloc_d['afternoon_low'] = afternoon_frame['l'].min()
-    hloc_d['afternoon_high_time'] = afternoon_frame['h'].idxmax()
-    hloc_d['afternoon_low_time'] = afternoon_frame['l'].idxmin()
-    hloc_d['afternoon_volume'] = afternoon_frame['v'].sum()
-    hloc_d['afternoon_high_time'] = hloc_d['afternoon_high_time'] - eastern_td
-    hloc_d['afternoon_low_time'] = hloc_d['afternoon_low_time'] - eastern_td
+    if afternoon_frame.empty:
+        hloc_d['afternoon_high'] = 'n/a'
+        hloc_d['afternoon_low'] = 'n/a'
+        hloc_d['afternoon_high_time'] = 'n/a'
+        hloc_d['afternoon_low_time'] = 'n/a'
+        hloc_d['afternoon_volume'] = 'n/a'
+    else:
+        hloc_d['afternoon_high'] = afternoon_frame['h'].max()
+        hloc_d['afternoon_low'] = afternoon_frame['l'].min()
+        hloc_d['afternoon_high_time'] = afternoon_frame['h'].idxmax()
+        hloc_d['afternoon_low_time'] = afternoon_frame['l'].idxmin()
+        hloc_d['afternoon_volume'] = afternoon_frame['v'].sum()
+        hloc_d['afternoon_high_time'] = hloc_d['afternoon_high_time'] - eastern_td
+        hloc_d['afternoon_low_time'] = hloc_d['afternoon_low_time'] - eastern_td
 
     return hloc_d
 

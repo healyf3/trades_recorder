@@ -7,7 +7,7 @@ import datetime
 import pandas as pd
 
 
-gspread_worksheet = sys.argv[2]
+gspread_worksheet = sys.argv[1]
 
 config_object = ConfigParser()
 config_object.read("config/config.ini")
@@ -37,12 +37,9 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
 
         today_dt = datetime.datetime.today()
 
-        if (today_dt - gspread_trade_date).days < 1:
-            dbg_print("For ticker: " + gspread_entries["Ticker"] + "Wait at least one day after trade took place to grab HLOC information")
-            continue
-
-        # Wait 3 days to grab data. This doesn't account for holidays and weekends yet.
-        if (today_dt - gspread_trade_date).days < 3:
+        # Wait 4 days to grab data. This doesn't account for holidays and weekends yet.
+        able_to_grab_data = (today_dt - gspread_trade_date).days < 4
+        if able_to_grab_data:
             dbg_print("Wait until market close to grab HLOC information for ticker " + gspread_entries["Ticker"])
             continue
 
@@ -58,7 +55,21 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         gspread_all_values_dict[idx]['Next Low'] = hloc_dict['next_day_low']
         gspread_all_values_dict[idx]['Next Open'] = hloc_dict['next_day_open']
         gspread_all_values_dict[idx]['Next Close'] = hloc_dict['next_day_close']
-        gspread_all_values_dict[idx]['High Time'] = hloc_dict['next_day_close']
+        gspread_all_values_dict[idx]['High Time'] = hloc_dict['high_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
+        gspread_all_values_dict[idx]['Low Time'] = hloc_dict['low_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
+        gspread_all_values_dict[idx]['Next High Time'] = hloc_dict['next_day_high_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
+        gspread_all_values_dict[idx]['Next Low Time'] = hloc_dict['next_day_low_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
+        gspread_all_values_dict[idx]['Morn High'] = hloc_dict['morning_high']
+        gspread_all_values_dict[idx]['Morn Low'] = hloc_dict['morning_low']
+        gspread_all_values_dict[idx]['Aft High'] = hloc_dict['afternoon_high']
+        gspread_all_values_dict[idx]['Aft Low'] = hloc_dict['afternoon_low']
+        gspread_all_values_dict[idx]['Morn High Time'] = hloc_dict['morning_high_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
+        gspread_all_values_dict[idx]['Morn Low Time'] = hloc_dict['morning_low_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
+        gspread_all_values_dict[idx]['Aft High Time'] = hloc_dict['afternoon_high_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
+        gspread_all_values_dict[idx]['Aft Low Time'] = hloc_dict['afternoon_low_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
+
+        if gspread_entries['Ticker'] == 'IDAI':
+            break
 
 # publish updated worksheet
 gspread_df = pd.DataFrame(gspread_all_values_dict)
@@ -68,3 +79,4 @@ gspread_first_auto_entry_column_idx = worksheet.find(gspread_first_auto_entry_co
 gspread_last_raw_value_column_idx = worksheet.find(gspread_last_auto_entry_column)
 #worksheet.update([gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
 worksheet.update(gspread_first_auto_entry_column_idx.address + ':' + gspread_last_raw_value_column_idx.address[0:-1]+str(len(gspread_all_values_dict)+1),
+                 [gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
