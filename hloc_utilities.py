@@ -4,13 +4,14 @@ import gspread
 from grab_holiday_dates import grab_holidays_from_csv
 import pytz
 from configparser import ConfigParser
-from polygon import RESTClient as plygRESTC
-from typing import cast
-from urllib3 import HTTPResponse
 import json
 import pandas as pd
+from typing import cast
+from urllib3 import HTTPResponse
 
 import util
+from util import polygon_client
+
 
 def get_daily_ticks(ticker, years, end_date):
     end_date_dt = datetime.datetime.strptime(end_date, '%Y-%m-%d')
@@ -26,12 +27,7 @@ def get_daily_ticks(ticker, years, end_date):
 
     return tick_df
 
-# Grab TD configuration values.
-config = ConfigParser()
-config.read('config/config.ini')
-polygon_api_key = config.get('main', 'POLYGON_API_KEY')
-polygon_client = plygRESTC(polygon_api_key)
-POLYGON_TRADES_HISTORY_RESPONSE_LIMIT = 50000
+
 
 def get_intraday_data(ticker, start_dt, strategy_name):
 
@@ -58,6 +54,7 @@ def get_intraday_data(ticker, start_dt, strategy_name):
 
         ddict = json.loads(aggs.data.decode("utf-8"))
         tick_df = pd.DataFrame(ddict['results'])
+
         last_timestamp_datetime = datetime.datetime.fromtimestamp(tick_df.iloc[-1]['t']/1000)
         # This accounts for a stock that haulted during the day. This checks to the last timestamp in the frame and
         # verifies that it has data at 10am the next day
@@ -186,6 +183,34 @@ def get_daily_volume_count():
 def get_premarket_volume_count():
     return
 
+def get_day_and_max_3_year_dollar_volume(ticker,start_date_dt):
+    end_date_dt = start_date_dt
+    start_date_dt = end_date_dt - timedelta(days=3*365)
+    # the daily vwap is accurate. Intraday needs to be computed by hand
+    aggs = cast(
+        HTTPResponse,
+        polygon_client.get_aggs(ticker, 1, "day", start_date_dt, end_date_dt, raw=True),
+    )
+
+    ddict = json.loads(aggs.data.decode("utf-8"))
+    stock_df = pd.DataFrame(ddict['results'])
+
+    stock_df['dollar_volume'] = stock_df['vw'] * stock_df['v']
+    day_dollar_volume = stock_df['dollar_volume'].iloc[-1]
+    max_3_year_dollar_volume = stock_df['dollar_volume'].max()
+    max_dollar_volume_ts = stock_df['t'].iloc[stock_df['dollar_volume'].idxmax()]
+    max_3_year_dollar_volume_date = datetime.datetime.fromtimestamp(max_dollar_volume_ts/1000).strftime("%m/%d/%y")
+
+    return day_dollar_volume, max_3_year_dollar_volume, max_3_year_dollar_volume_date
+
+def compute_vwap(stock_df):
+    stock_df['vcumsum'] = stock_df['v'].cumsum()
+    stock_df['v*p'] = stock_df['v']*((stock_df['h']+stock_df['l']+stock_df['c'])/3)
+    stock_df['vp_cumsum'] = stock_df['v*p'].cumsum()
+    stock_df['vwap'] = stock_df['vp_cumsum']/stock_df['vcumsum']
+
+    return stock_df
+
 
 def hloc(frame, time_frame, t_delta, eastern_td):
     """ Returns:
@@ -196,6 +221,7 @@ def hloc(frame, time_frame, t_delta, eastern_td):
         5. High Time
         6. Low Time
         7. Volume
+        8. $ Volume
     """
 
     hloc_d = dict()
@@ -281,6 +307,7 @@ def whole_day_hloc(frame, t_delta):
     15. Morning Low Time
     15. Afternoon High Time
     15. Afternoon Low Time
+    16. $ Volume
     """
     local_frame = frame.copy()
     # check for daylight savings time
@@ -439,6 +466,3 @@ def reg_market_hloc(frame, t_delta):
     hloc_d['afternoon_low_time'] = hloc_d['afternoon_low_time'] - eastern_td
 
     return hloc_d
-
-#def record_hloc():
-#    if gspread_all_values_dict[idx]['Side'] == 'B'

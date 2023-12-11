@@ -31,10 +31,7 @@ def plot_intraday(frame, ticker, date, strategy_name=None):
     time = stock_df['datetime'].tolist()
 
     #determine vwap
-    stock_df['vcumsum'] = stock_df['v'].cumsum()
-    stock_df['v*p'] = stock_df['v']*((stock_df['h']+stock_df['l']+stock_df['c'])/3)
-    stock_df['vp_cumsum'] = stock_df['v*p'].cumsum()
-    stock_df['vwap'] = stock_df['vp_cumsum']/stock_df['vcumsum']
+    stock_df = hloc_utilities.compute_vwap(stock_df)
 
     # Find high and low points
     #d = .02

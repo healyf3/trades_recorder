@@ -12,7 +12,7 @@ gspread_worksheet = sys.argv[1]
 config_object = ConfigParser()
 config_object.read("config/config.ini")
 
-gspread_first_auto_entry_column = 'Prev Close'
+gspread_first_auto_entry_column = '$ Volume'
 gspread_last_auto_entry_column = 'Aft Low Time'
 
 if 'trades' == gspread_worksheet:
@@ -33,19 +33,25 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
     if gspread_entries['Next Close'] == '':
 
         # Grab the date of trade
-        gspread_trade_date = datetime.datetime.strptime(gspread_entries['Date'], '%m/%d/%Y')
+        gspread_trade_dt = datetime.datetime.strptime(gspread_entries['Date'], '%m/%d/%Y')
 
         today_dt = datetime.datetime.today()
 
         # Wait 4 days to grab data. This doesn't account for holidays and weekends yet.
-        able_to_grab_data = (today_dt - gspread_trade_date).days < 4
+        able_to_grab_data = (today_dt - gspread_trade_dt).days < 4
         if able_to_grab_data:
             dbg_print("Wait until market close to grab HLOC information for ticker " + gspread_entries["Ticker"])
             continue
 
         # Grab hloc info
-        hloc_dict = hloc_utilities.get_intraday_data(gspread_entries['Ticker'], gspread_trade_date, gspread_entries['Strategy'])
+        hloc_dict = hloc_utilities.get_intraday_data(gspread_entries['Ticker'], gspread_trade_dt, gspread_entries['Strategy'])
 
+        hloc_dict['dollar_volume'], hloc_dict['max_3_year_dollar_volume'], hloc_dict['max_3_year_dollar_volume_date'] = \
+            hloc_utilities.get_day_and_max_3_year_dollar_volume(gspread_entries['Ticker'], gspread_trade_dt)
+
+        gspread_all_values_dict[idx]['$ Volume'] = hloc_dict['dollar_volume']
+        gspread_all_values_dict[idx]['Max 3 Year $ Volume'] = hloc_dict['max_3_year_dollar_volume']
+        gspread_all_values_dict[idx]['Max 3 Year $ Vol Date'] = hloc_dict['max_3_year_dollar_volume_date']
         gspread_all_values_dict[idx]['Prev Close'] = hloc_dict['previous_close']
         gspread_all_values_dict[idx]['High'] = hloc_dict['high']
         gspread_all_values_dict[idx]['Low'] = hloc_dict['low']
@@ -68,8 +74,9 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         gspread_all_values_dict[idx]['Aft High Time'] = hloc_dict['afternoon_high_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
         gspread_all_values_dict[idx]['Aft Low Time'] = hloc_dict['afternoon_low_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
 
-        if gspread_entries['Ticker'] == 'IDAI':
-            break
+        # For testing
+        #if gspread_entries['Ticker'] == 'CUEN':
+        #    break
 
 # publish updated worksheet
 gspread_df = pd.DataFrame(gspread_all_values_dict)

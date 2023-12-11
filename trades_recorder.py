@@ -68,7 +68,7 @@ gspread_all_values_dict = util.get_gspread_worksheet_values(worksheet)
 #   Sector
 #   % Open Gain
 gspread_first_auto_entry_column = 'Broker'
-gspread_first_hloc_column = 'Prev Close'
+gspread_first_hloc_column = '$ Volume'
 
 # TODO: this will probably be an etrade specific variable if we are grabbing from the etrade website trade document
 # csv_file_date = datetime.today()
@@ -126,9 +126,6 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                 print("Broker unknown. Skipping trade")
                 continue
 
-
-
-
         ticker_entry_shares = gspread_all_values_dict[idx]['Entry Shares']
         ticker_avg_entry_price = gspread_all_values_dict[idx]['Avg Entry Price']
         ticker_exit_shares = gspread_all_values_dict[idx]['Exit Shares']
@@ -146,7 +143,16 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
             continue
 
         # Get fundamental data
-        fundamentals_dict = util.grab_finviz_fundamentals(ticker)
+        float = gspread_all_values_dict[idx]['Float']
+        mkt_cap = gspread_all_values_dict[idx]['Market Cap']
+        sector = gspread_all_values_dict[idx]['Sector']
+        industry = gspread_all_values_dict[idx]['Industry']
+        exchange = gspread_all_values_dict[idx]['Exchange']
+        fundamentals_dict = dict()
+        update_fundamentals = False
+        if float == '' or mkt_cap == '' or sector == '' or industry == '' or exchange == '':
+            fundamentals_dict = util.grab_finviz_fundamentals(ticker)
+            update_fundamentals = True
 
         for val in csv_df_share_sum[ticker].items():
             if val[0] == gspread_all_values_dict[idx]['Side']:
@@ -227,11 +233,12 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         gspread_all_values_dict[idx]['First Exit Time'] = str(ticker_first_exit_datetime)
         gspread_all_values_dict[idx]['Last Exit Time'] = str(ticker_last_exit_datetime)
         gspread_all_values_dict[idx]['Broker'] = broker
-        gspread_all_values_dict[idx]['Float'] = fundamentals_dict['Float']
-        gspread_all_values_dict[idx]['Market Cap'] = fundamentals_dict['Market Cap']
-        gspread_all_values_dict[idx]['Sector'] = fundamentals_dict['Sector']
-        gspread_all_values_dict[idx]['Industry'] = fundamentals_dict['Industry']
-        gspread_all_values_dict[idx]['Exchange'] = fundamentals_dict['Exchange']
+        if update_fundamentals:
+            gspread_all_values_dict[idx]['Float'] = fundamentals_dict['Float']
+            gspread_all_values_dict[idx]['Market Cap'] = fundamentals_dict['Market Cap']
+            gspread_all_values_dict[idx]['Sector'] = fundamentals_dict['Sector']
+            gspread_all_values_dict[idx]['Industry'] = fundamentals_dict['Industry']
+            gspread_all_values_dict[idx]['Exchange'] = fundamentals_dict['Exchange']
 
         # Ideal Entry Prices and Times #
         # Ideal entry prices and times can be computed after market close
