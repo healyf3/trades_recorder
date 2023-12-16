@@ -4,6 +4,7 @@ import csv
 import pandas as pd
 import gspread
 from datetime import datetime
+from datetime import timedelta
 import re
 from configparser import ConfigParser
 
@@ -115,6 +116,29 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
     # Find first exit shares cell that doesn't equal entry shares cell
     if gspread_entries['Entry Shares'] != gspread_entries['Exit Shares'] or gspread_entries['Entry Shares'] == "":
 
+        # Get fundamental data
+        float = gspread_all_values_dict[idx]['Float']
+        mkt_cap = gspread_all_values_dict[idx]['Market Cap']
+        sector = gspread_all_values_dict[idx]['Sector']
+        industry = gspread_all_values_dict[idx]['Industry']
+        exchange = gspread_all_values_dict[idx]['Exchange']
+        fundamentals_dict = dict()
+        update_fundamentals = False
+
+        curr_date_trade_date_delta = datetime.today().date() - gspread_trade_date.date()
+        # want to fundamental info somewhat accurate so don't record it if 5 days have passed
+        if curr_date_trade_date_delta < timedelta(days=5) and (float == '' or mkt_cap == '' or sector == '' or industry == '' or exchange == ''):
+            fundamentals_dict = util.grab_finviz_fundamentals(gspread_entries['Ticker'])
+            update_fundamentals = True
+
+
+        # update fundamentals if need be regardless of appropriate hloc recording
+        if update_fundamentals:
+            gspread_all_values_dict[idx]['Float'] = fundamentals_dict['Float']
+            gspread_all_values_dict[idx]['Market Cap'] = fundamentals_dict['Market Cap']
+            gspread_all_values_dict[idx]['Sector'] = fundamentals_dict['Sector']
+            gspread_all_values_dict[idx]['Industry'] = fundamentals_dict['Industry']
+            gspread_all_values_dict[idx]['Exchange'] = fundamentals_dict['Exchange']
 
         # Grab ticker and ticker's side from spreadsheet
         if gspread_all_values_dict[idx]['Side'] == "":
@@ -141,18 +165,6 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         if csv_df_share_sum.get(ticker) is None or \
                 ((gspread_trade_date != csv_file_date) and not ticker_entry_shares):
             continue
-
-        # Get fundamental data
-        float = gspread_all_values_dict[idx]['Float']
-        mkt_cap = gspread_all_values_dict[idx]['Market Cap']
-        sector = gspread_all_values_dict[idx]['Sector']
-        industry = gspread_all_values_dict[idx]['Industry']
-        exchange = gspread_all_values_dict[idx]['Exchange']
-        fundamentals_dict = dict()
-        update_fundamentals = False
-        if float == '' or mkt_cap == '' or sector == '' or industry == '' or exchange == '':
-            fundamentals_dict = util.grab_finviz_fundamentals(ticker)
-            update_fundamentals = True
 
         for val in csv_df_share_sum[ticker].items():
             if val[0] == gspread_all_values_dict[idx]['Side']:
@@ -233,12 +245,6 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         gspread_all_values_dict[idx]['First Exit Time'] = str(ticker_first_exit_datetime)
         gspread_all_values_dict[idx]['Last Exit Time'] = str(ticker_last_exit_datetime)
         gspread_all_values_dict[idx]['Broker'] = broker
-        if update_fundamentals:
-            gspread_all_values_dict[idx]['Float'] = fundamentals_dict['Float']
-            gspread_all_values_dict[idx]['Market Cap'] = fundamentals_dict['Market Cap']
-            gspread_all_values_dict[idx]['Sector'] = fundamentals_dict['Sector']
-            gspread_all_values_dict[idx]['Industry'] = fundamentals_dict['Industry']
-            gspread_all_values_dict[idx]['Exchange'] = fundamentals_dict['Exchange']
 
         # Ideal Entry Prices and Times #
         # Ideal entry prices and times can be computed after market close

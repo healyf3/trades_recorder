@@ -12,7 +12,7 @@ gspread_worksheet = sys.argv[1]
 config_object = ConfigParser()
 config_object.read("config/config.ini")
 
-gspread_first_auto_entry_column = '$ Volume'
+gspread_first_auto_entry_column = 'Float'
 gspread_last_auto_entry_column = 'Aft Low Time'
 
 if 'trades' == gspread_worksheet:
@@ -30,10 +30,29 @@ gspread_all_values_dict = util.get_gspread_worksheet_values(worksheet)
 
 # Find entries that aren't filled.
 for idx, gspread_entries in enumerate(gspread_all_values_dict):
+
+    dbg_print(gspread_entries['Ticker'])
+
+    # Grab the date of trade
+    gspread_trade_dt = datetime.datetime.strptime(gspread_entries['Date'], '%m/%d/%Y')
+
+    # Get fundamental data
+    float = gspread_all_values_dict[idx]['Float']
+    mkt_cap = gspread_all_values_dict[idx]['Market Cap']
+    sector = gspread_all_values_dict[idx]['Sector']
+    industry = gspread_all_values_dict[idx]['Industry']
+    exchange = gspread_all_values_dict[idx]['Exchange']
+    fundamentals_dict = dict()
+    update_fundamentals = False
+
+    curr_date_trade_date_delta = datetime.datetime.today().date() - gspread_trade_dt.date()
+    # want to fundamental info somewhat accurate so don't record it if 5 days have passed
+    if curr_date_trade_date_delta < datetime.timedelta(days=5) and (float == '' or mkt_cap == '' or sector == '' or industry == '' or exchange == ''):
+        fundamentals_dict = util.grab_finviz_fundamentals(gspread_entries['Ticker'])
+        update_fundamentals = True
+
     if gspread_entries['Next Close'] == '':
 
-        # Grab the date of trade
-        gspread_trade_dt = datetime.datetime.strptime(gspread_entries['Date'], '%m/%d/%Y')
 
         today_dt = datetime.datetime.today()
 
@@ -75,8 +94,19 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         gspread_all_values_dict[idx]['Aft Low Time'] = hloc_dict['afternoon_low_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
 
         # For testing
-        #if gspread_entries['Ticker'] == 'CUEN':
+        #if gspread_entries['Ticker'] == 'KXIN':
         #    break
+
+    # update fundamentals if need be regardless of appropriate hloc recording
+    if update_fundamentals:
+        gspread_all_values_dict[idx]['Float'] = fundamentals_dict['Float']
+        gspread_all_values_dict[idx]['Market Cap'] = fundamentals_dict['Market Cap']
+        gspread_all_values_dict[idx]['Sector'] = fundamentals_dict['Sector']
+        gspread_all_values_dict[idx]['Industry'] = fundamentals_dict['Industry']
+        gspread_all_values_dict[idx]['Exchange'] = fundamentals_dict['Exchange']
+
+
+
 
 # publish updated worksheet
 gspread_df = pd.DataFrame(gspread_all_values_dict)

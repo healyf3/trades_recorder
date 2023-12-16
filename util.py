@@ -133,10 +133,22 @@ def convert24(str1):
 
 def grab_finviz_fundamentals(ticker):
 
-    stock = finvizfinance(ticker)
+    stock_dict = dict()
+
+    stock_dict['Float'] = 'na'
+    stock_dict['Market Cap'] = 'na'
+    stock_dict['Sector'] = 'na'
+    stock_dict['Industry'] = 'na'
+    stock_dict['Exchange'] = 'na'
+
+    try:
+        stock = finvizfinance(ticker)
+    except:
+        print("error grabbing data for ticker: " + ticker)
+        return
+
     fundamentals = stock.ticker_fundament()
 
-    stock_dict = dict()
 
     stock_dict['Float'] = convert_stock_info_string_to_float(fundamentals['Shs Float'])
     stock_dict['Market Cap'] = convert_stock_info_string_to_float(fundamentals['Market Cap'])

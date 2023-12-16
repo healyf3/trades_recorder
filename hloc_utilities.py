@@ -66,13 +66,22 @@ def get_intraday_data(ticker, start_dt, strategy_name):
         next_day_t_delta = next_day_t_delta + timedelta(days=1)
 
 
-    # grab previous close
-    prev_aggs = cast(
-        HTTPResponse,
-        polygon_client.get_aggs(ticker, 1, "day", prev_dt.date(), prev_dt.date(), raw=True),
-    )
+    # this previous date logic accounts for halts that may last up to months
+    prev_ddict = dict()
+    prev_ddict['query_count'] = 0
+    previous_date = prev_dt.date()
+    while True:
+        # grab previous close
+        prev_aggs = cast(
+            HTTPResponse,
+            polygon_client.get_aggs(ticker, 1, "day", previous_date, previous_date, raw=True),
+        )
 
-    prev_ddict = json.loads(prev_aggs.data.decode("utf-8"))
+        prev_ddict = json.loads(prev_aggs.data.decode("utf-8"))
+        if prev_ddict['queryCount'] > 0:
+            break
+        previous_date = previous_date - timedelta(days=1)
+
     prev_tick_df = pd.DataFrame(prev_ddict['results'])
     data_dict['previous_close'] = float(prev_tick_df['c'][0]) # in some cases when the number is even, the type will be int64 which isn't serializable by gspread
 
