@@ -169,8 +169,7 @@ def convert_stock_info_string_to_float(info):
         info = float(info[0:-1])*1000000000
         return info
     else:
-        print('data has suffix other than M or B. Exiting program')
-        exit()
+        print('float data has suffix other than M or B.')
 
 def get_ticker_list():
 
