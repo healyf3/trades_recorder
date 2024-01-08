@@ -24,7 +24,7 @@ import util
 config_object = ConfigParser()
 config_object.read("config/config.ini")
 
-def plot_intraday(frame, ticker, date, strategy_name=None):
+def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None):
     stock_df = frame.copy()
     stock_df['datetime'] = stock_df.t.apply(lambda x: datetime.datetime.fromtimestamp(x / 1000).astimezone(pytz.timezone('UTC')))
     stock_df['datetime'] = stock_df['datetime'].dt.tz_convert('US/Eastern')
@@ -50,6 +50,23 @@ def plot_intraday(frame, ticker, date, strategy_name=None):
                     showlegend=False),
                   secondary_y=True)
     fig.add_trace(go.Bar(x=stock_df['datetime'], y=stock_df['v'], marker=dict(color="pink"), showlegend=False), secondary_y=False)
+
+    if buys != None:
+            for i in buys:
+                dt_str = i[0] + ' ' + i[1]
+                dt = datetime.datetime.strptime(dt_str, "%m/%d/%y %H:%M")
+                fig.add_trace(
+                    go.Scatter(x=[dt], y=[i[5]], showlegend=False,
+                               marker=go.scatter.Marker(size=8, symbol=['triangle-up'], color='Green')),
+                    secondary_y=True)
+    if sells != None:
+        for i in sells:
+            dt_str = i[0] + ' ' + i[1]
+            dt = datetime.datetime.strptime(dt_str, "%m/%d/%y %H:%M")
+            fig.add_trace(
+                go.Scatter(x=[dt], y=[i[5]], showlegend=False,
+                           marker=go.scatter.Marker(size=8, symbol=['triangle-down'], color='Red')),
+                secondary_y=True)
 
     fig.add_trace(go.Scatter(x=[low_point[0],high_point[0]],y=[low_point[1],high_point[1]], mode='markers+text',
                              text=['low','high'],textposition='top center', showlegend=False,
@@ -82,7 +99,7 @@ def plot_intraday(frame, ticker, date, strategy_name=None):
     fig.update_layout(title=ticker)
     #fig.show()
     if strategy_name is not None:
-        image_name = ticker + '_' + strategy_name + "_" + date + '_' + 'intraday' + '.png'
+        image_name = ticker + '_' + strategy_name + "_" + date.strftime("%Y-%m-%d") + '_' + 'intraday' + '.png'
     else:
         image_name = ticker + "_" + date + '_' + 'intraday' + '.png'
 
@@ -153,11 +170,11 @@ def plot_daily(frame, ticker, date, strategy_name=None):
     fig.write_image(image_path, format='png', scale=15)
     return image_path
 
-def graph_stock(ticker, start_date, end_date, strategy, gspread_worksheet):
+def graph_stock(ticker, start_date, end_date, strategy, gspread_worksheet, buys, sells):
     intraday_frame = hloc_utilities.get_intraday_ticks(ticker, start_date, end_date)
     daily_frame = hloc_utilities.get_daily_ticks(ticker, 5, start_date)
 
-    intraday_image = plot_intraday(intraday_frame, ticker, start_date, strategy_name=strategy)
+    intraday_image = plot_intraday(intraday_frame, ticker, start_date, buys, sells, strategy_name=strategy)
     daily_image = plot_daily(daily_frame, ticker, start_date, strategy_name=strategy)
 
     image_list = [daily_image, intraday_image]
@@ -174,7 +191,7 @@ def graph_stock(ticker, start_date, end_date, strategy, gspread_worksheet):
         new_im.paste(im, (x_offset, 0))
         x_offset += im.size[0]
 
-    image_name = ticker[0] + '_' + ticker[1] + '.png'
+    image_name = ticker + '_' + start_date + '_' + end_date + '.png'
     new_im.save('graphs/' + image_name)
 
     # only upload files that don't exist
@@ -203,5 +220,5 @@ def graph_stock(ticker, start_date, end_date, strategy, gspread_worksheet):
     gspread_worksheet.append_row(values=result)
 
 
-worksheet_test = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'], 'ttest')
-graph_stock('VVOS', '2023-11-29', '2023-11-29', 'test',worksheet_test)
+#worksheet_test = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'], 'ttest')
+#graph_stock('VVOS', '2023-11-29', '2023-11-29', 'test',worksheet_test, sells=None, buys=None)

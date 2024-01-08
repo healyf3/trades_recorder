@@ -11,6 +11,7 @@ from configparser import ConfigParser
 import util
 import hloc_utilities
 from trading_charts_folder_ids import folder_ids
+from graph_stock import graph_stock
 
 trades_file = sys.argv[1]
 print(trades_file)
@@ -115,6 +116,12 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
 
     # Find first exit shares cell that doesn't equal entry shares cell
     if gspread_entries['Entry Shares'] != gspread_entries['Exit Shares'] or gspread_entries['Entry Shares'] == "":
+
+        # worksheet_test is the test case worksheet
+        buys = csv_df.loc[csv_df['Side'] == 'B'].values.tolist()
+        sells = csv_df.loc[csv_df['Side'] == 'S'].values.tolist()
+        worksheet_test = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'], 'ttest')
+        graph_stock(ticker, gspread_trade_date, gspread_trade_date, strategy, worksheet_test, sells, buys)
 
         # Get fundamental data
         float = gspread_all_values_dict[idx]['Float']

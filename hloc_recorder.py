@@ -32,8 +32,8 @@ gspread_all_values_dict = util.get_gspread_worksheet_values(worksheet)
 for idx, gspread_entries in enumerate(gspread_all_values_dict):
 
     # For testing
-    if gspread_entries['Ticker'] == 'NGM' or gspread_entries['Ticker'] == 'VYGR':
-        continue
+    #if gspread_entries['Ticker'] == 'NGM' or gspread_entries['Ticker'] == 'VYGR':
+    #    continue
 
     dbg_print(gspread_entries['Ticker'])
 

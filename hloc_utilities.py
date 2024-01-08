@@ -14,7 +14,11 @@ from util import polygon_client
 
 
 def get_daily_ticks(ticker, years, end_date):
-    end_date_dt = datetime.datetime.strptime(end_date, '%Y-%m-%d')
+    if type(end_date) is datetime.datetime:
+        end_date_dt = end_date
+    else:
+        end_date_dt = datetime.datetime.strptime(end_date, '%Y-%m-%d')
+
     start_date_dt = datetime.datetime(year=end_date_dt.year-years, month=end_date_dt.month, day=end_date_dt.day)
 
     aggs = cast(
