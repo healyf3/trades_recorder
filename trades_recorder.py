@@ -118,10 +118,13 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
     if gspread_entries['Entry Shares'] != gspread_entries['Exit Shares'] or gspread_entries['Entry Shares'] == "":
 
         # worksheet_test is the test case worksheet
-        buys = csv_df.loc[csv_df['Side'] == 'B'].values.tolist()
-        sells = csv_df.loc[csv_df['Side'] == 'S'].values.tolist()
+        buys = csv_df.loc[(csv_df['Side'] == 'B') & (csv_df['Symb'] == ticker)].values.tolist()
+        sells = csv_df.loc[(csv_df['Side'] == 'S') & (csv_df['Symb'] == ticker)].values.tolist()
         worksheet_test = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'], 'ttest')
-        graph_stock(ticker, gspread_trade_date, gspread_trade_date, strategy, worksheet_test, sells, buys)
+        graph_stock(ticker, gspread_trade_date, gspread_trade_date, strategy, worksheet_test, buys, sells,
+                    risk=gspread_entries['Risk Price'], avg_entry=gspread_entries['Avg Entry Price'],
+                    avg_exit=gspread_entries['Avg Exit Price'], right=gspread_entries['Right'],
+                    wrong=gspread_entries['Wrong'], cont=gspread_entries['Continue'])
 
         # Get fundamental data
         float = gspread_all_values_dict[idx]['Float']

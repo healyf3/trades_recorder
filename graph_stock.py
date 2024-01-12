@@ -24,7 +24,8 @@ import util
 config_object = ConfigParser()
 config_object.read("config/config.ini")
 
-def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None):
+def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None, risk=None, avg_entry=None, avg_exit=None,
+                  right=None, wrong=None, cont=None):
     stock_df = frame.copy()
     stock_df['datetime'] = stock_df.t.apply(lambda x: datetime.datetime.fromtimestamp(x / 1000).astimezone(pytz.timezone('UTC')))
     stock_df['datetime'] = stock_df['datetime'].dt.tz_convert('US/Eastern')
@@ -49,7 +50,10 @@ def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None):
                     close=stock_df['c'],
                     showlegend=False),
                   secondary_y=True)
-    fig.add_trace(go.Bar(x=stock_df['datetime'], y=stock_df['v'], marker=dict(color="pink"), showlegend=False), secondary_y=False)
+    fig.add_trace(go.Scatter(x=stock_df['datetime'], y=stock_df['v'], marker=dict(color="pink"), showlegend=False), secondary_y=False)
+    #fig.add_trace(go.Bar(x=stock_df['datetime'], y=stock_df['v'], marker=dict(color="pink"), showlegend=False), secondary_y=False)
+    #fig.update_layout(bargap=0.9, autosize=True, barmode='group')
+    #fig.update_traces(width=1000*3600*24*0.8)
 
     if buys != None:
             for i in buys:
@@ -57,7 +61,7 @@ def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None):
                 dt = datetime.datetime.strptime(dt_str, "%m/%d/%y %H:%M")
                 fig.add_trace(
                     go.Scatter(x=[dt], y=[i[5]], showlegend=False,
-                               marker=go.scatter.Marker(size=8, symbol=['triangle-up'], color='Green')),
+                               marker=go.scatter.Marker(size=12, symbol=['triangle-up'], color='#74F478')),
                     secondary_y=True)
     if sells != None:
         for i in sells:
@@ -65,7 +69,7 @@ def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None):
             dt = datetime.datetime.strptime(dt_str, "%m/%d/%y %H:%M")
             fig.add_trace(
                 go.Scatter(x=[dt], y=[i[5]], showlegend=False,
-                           marker=go.scatter.Marker(size=8, symbol=['triangle-down'], color='Red')),
+                           marker=go.scatter.Marker(size=12, symbol=['triangle-down'], color='#791004')),
                 secondary_y=True)
 
     fig.add_trace(go.Scatter(x=[low_point[0],high_point[0]],y=[low_point[1],high_point[1]], mode='markers+text',
@@ -74,7 +78,10 @@ def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None):
                         secondary_y=True)
 
     # fig.add_vline(x=time[ticker_index_width=0.6, line_color='white')
-    fig.add_trace(go.Scatter(x=stock_df['datetime'], y=stock_df['vwap'], mode='lines', name='VWAP'), secondary_y=True)
+    fig.add_trace(go.Scatter(x=stock_df['datetime'], y=stock_df['vwap'], mode='lines', name='VWAP',
+                             marker=go.scatter.Marker(color='Purple')),
+                            secondary_y=True)
+
     #fig.add_trace(go.Scatter(x=stock_df['datetime'], y=stock_df['marker'], mode='markers', name='markers',
     #                         marker=go.scatter.Marker(size=5, symbol=stock_df['symbol'], color=stock_df['color'])), secondary_y=True)
 
@@ -94,14 +101,89 @@ def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None):
                 continue
         fig.add_vline(x=x, line_width=0.6, line_color='white', line_dash='dash')
 
+
+
     fig.update_yaxes(title='Volume', secondary_y=False)
     fig.update_yaxes(title='Price', secondary_y=True)
-    fig.update_layout(title=ticker)
+
+ #   fig.add_annotation(
+ #       x=5, y=35,  # Text annotation position
+ #       xref="x", yref="y",  # Coordinate reference system
+ #       text='Test',  # Text content
+ #       showarrow=False  # Hide arrow
+ #   )
+
+    if risk != None or avg_entry != None or avg_exit != None or right != None or wrong != None or cont != None:
+        fig.add_annotation(dict(font=dict(color='yellow', size=15),
+                                x=-0.1,
+                                y=-0.22,
+                                showarrow=False,
+                                text='Risk: ' + str(risk),
+                                textangle=0,
+                                xanchor='left',
+                                xref="paper",
+                                yref="paper"))
+
+        fig.add_annotation(dict(font=dict(color='yellow', size=15),
+                                x=0.2,
+                                y=-0.22,
+                                showarrow=False,
+                                text='Avg Entry: ' + str(avg_entry),
+                                textangle=0,
+                                xanchor='left',
+                                xref="paper",
+                                yref="paper"))
+
+        fig.add_annotation(dict(font=dict(color='yellow', size=15),
+                                x=0.6,
+                                y=-0.22,
+                                showarrow=False,
+                                text='Avg Exit: ' + str(avg_exit),
+                                textangle=0,
+                                xanchor='left',
+                                xref="paper",
+                                yref="paper"))
+
+        fig.add_annotation(dict(font=dict(color='Green', size=15),
+                                x=0.2,
+                                y=1.2,
+                                showarrow=False,
+                                text="Right: " + right,
+                                textangle=0,
+                                xanchor='left',
+                                xref="paper",
+                                yref="paper"))
+
+        fig.add_annotation(dict(font=dict(color='Red', size=15),
+                                x=0.2,
+                                y=1.15,
+                                showarrow=False,
+                                text="Wrong: " + wrong,
+                                textangle=0,
+                                xanchor='left',
+                                xref="paper",
+                                yref="paper"))
+
+        fig.add_annotation(dict(font=dict(color='Orange', size=15),
+                                x=0.2,
+                                y=1.1,
+                                showarrow=False,
+                                text="Continue: " + cont,
+                                textangle=0,
+                                xanchor='left',
+                                xref="paper",
+                                yref="paper"))
+
+
+    fig.update_layout(title=go.layout.Title(
+        text=ticker + f"<br><sup>Strat: {strategy_name}</sup>"
+    ))
+
     #fig.show()
     if strategy_name is not None:
         image_name = ticker + '_' + strategy_name + "_" + date.strftime("%Y-%m-%d") + '_' + 'intraday' + '.png'
     else:
-        image_name = ticker + "_" + date + '_' + 'intraday' + '.png'
+        image_name = ticker + "_" + date.strftime("%Y-%m-%d") + '_' + 'intraday' + '.png'
 
     image_path = 'graphs/' + image_name
     fig.write_image(image_path, format='png', scale=15)
@@ -161,20 +243,22 @@ def plot_daily(frame, ticker, date, strategy_name=None):
     fig.update_layout(title=ticker)
     #fig.show()
     if strategy_name is not None:
-        image_name = ticker + '_' + strategy_name + "_" + date + '_' + 'daily' + '.png'
+        image_name = ticker + '_' + strategy_name + "_" + date.strftime("%Y-%m-%d") + '_' + 'daily' + '.png'
     else:
-        image_name = ticker + "_" + date + '_' + 'daily' + '.png'
+        image_name = ticker + "_" + date.strftime("%Y-%m-%d") + '_' + 'daily' + '.png'
 
     image_path = 'graphs/' + image_name
 
     fig.write_image(image_path, format='png', scale=15)
     return image_path
 
-def graph_stock(ticker, start_date, end_date, strategy, gspread_worksheet, buys, sells):
+def graph_stock(ticker, start_date, end_date, strategy, gspread_worksheet, buys, sells, risk=None,
+                avg_entry=None, avg_exit=None, right=None, wrong=None, cont=None):
     intraday_frame = hloc_utilities.get_intraday_ticks(ticker, start_date, end_date)
     daily_frame = hloc_utilities.get_daily_ticks(ticker, 5, start_date)
 
-    intraday_image = plot_intraday(intraday_frame, ticker, start_date, buys, sells, strategy_name=strategy)
+    intraday_image = plot_intraday(intraday_frame, ticker, start_date, buys, sells, strategy_name=strategy,
+                                   risk=risk, right=right, wrong=wrong, cont=cont)
     daily_image = plot_daily(daily_frame, ticker, start_date, strategy_name=strategy)
 
     image_list = [daily_image, intraday_image]
