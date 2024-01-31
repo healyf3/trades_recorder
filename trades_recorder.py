@@ -120,11 +120,7 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         # worksheet_test is the test case worksheet
         buys = csv_df.loc[(csv_df['Side'] == 'B') & (csv_df['Symb'] == ticker)].values.tolist()
         sells = csv_df.loc[(csv_df['Side'] == 'S') & (csv_df['Symb'] == ticker)].values.tolist()
-        worksheet_test = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'], 'ttest')
-        graph_stock(ticker, gspread_trade_date, gspread_trade_date, strategy, worksheet_test, buys, sells,
-                    risk=gspread_entries['Risk Price'], avg_entry=gspread_entries['Avg Entry Price'],
-                    avg_exit=gspread_entries['Avg Exit Price'], right=gspread_entries['Right'],
-                    wrong=gspread_entries['Wrong'], cont=gspread_entries['Continue'])
+
 
         # Get fundamental data
         float = gspread_all_values_dict[idx]['Float']
@@ -245,6 +241,14 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
 
                 #data_dict['google_chart_link'] = gfile.get('alternateLink')
 
+
+        worksheet_test = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'], 'ttest')
+        graph_link = graph_stock(ticker, gspread_trade_date, gspread_trade_date, strategy, buys, sells,
+                    risk=gspread_entries['Risk Price'], avg_entry=ticker_avg_entry_price,
+                    avg_exit=ticker_avg_exit_price, entry_time=ticker_first_entry_datetime,
+                    exit_time=ticker_last_exit_datetime, trade_side=gspread_all_values_dict[idx]['Side'],
+                    right=gspread_entries['Right'], wrong=gspread_entries['Wrong'], cont=gspread_entries['Continue'])
+
         # Place average entry and exit, entry and exit shares, and times back in gspread_all_values_dict at the current idx
         gspread_all_values_dict[idx]['Entry Shares'] = ticker_entry_shares
         gspread_all_values_dict[idx]['Avg Entry Price'] = ticker_avg_entry_price
@@ -255,6 +259,7 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         gspread_all_values_dict[idx]['First Exit Time'] = str(ticker_first_exit_datetime)
         gspread_all_values_dict[idx]['Last Exit Time'] = str(ticker_last_exit_datetime)
         gspread_all_values_dict[idx]['Broker'] = broker
+        gspread_all_values_dict[idx]['Chart'] = graph_link[0]
 
         # Ideal Entry Prices and Times #
         # Ideal entry prices and times can be computed after market close

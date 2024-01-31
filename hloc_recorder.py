@@ -5,6 +5,7 @@ import hloc_utilities
 from configparser import ConfigParser
 import datetime
 import pandas as pd
+from graph_stock import graph_stock
 
 
 gspread_worksheet = sys.argv[1]
@@ -12,7 +13,7 @@ gspread_worksheet = sys.argv[1]
 config_object = ConfigParser()
 config_object.read("config/config.ini")
 
-gspread_first_auto_entry_column = 'Float'
+gspread_first_auto_entry_column = 'Chart'
 gspread_last_auto_entry_column = 'Aft Low Time'
 
 if 'trades' == gspread_worksheet:
@@ -96,6 +97,13 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         gspread_all_values_dict[idx]['Morn Low Time'] = hloc_dict['morning_low_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
         gspread_all_values_dict[idx]['Aft High Time'] = hloc_dict['afternoon_high_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
         gspread_all_values_dict[idx]['Aft Low Time'] = hloc_dict['afternoon_low_time'].to_pydatetime().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
+
+        # For the 'trades' worksheet, the graph_stock function is called in trades_recorder.py
+        if 'missed_ops' == gspread_worksheet:
+            graph_link = graph_stock(gspread_entries['Ticker'], gspread_trade_dt, gspread_trade_dt,
+                                     gspread_entries['Strategy'])
+
+            gspread_all_values_dict[idx]['Chart'] = graph_link[0]
 
         # For testing
         #if gspread_entries['Ticker'] == 'TTOO':
