@@ -27,8 +27,8 @@ time_fmt = '%H:%M:%S'
 if 'etrade' == broker:
     time_fmt = '%H:%M'
 
-
-worksheet = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'],config_object['main']['GSPREAD_TRADES_WORKSHEET'])
+worksheet = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'],
+                                       config_object['main']['GSPREAD_TRADES_WORKSHEET'])
 worksheet_test = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'], 'ttest')
 
 gspread_all_values_dict = util.get_gspread_worksheet_values(worksheet)
@@ -117,11 +117,6 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
     # Find first exit shares cell that doesn't equal entry shares cell
     if gspread_entries['Entry Shares'] != gspread_entries['Exit Shares'] or gspread_entries['Entry Shares'] == "":
 
-        # worksheet_test is the test case worksheet
-        buys = csv_df.loc[(csv_df['Side'] == 'B') & (csv_df['Symb'] == ticker)].values.tolist()
-        sells = csv_df.loc[(csv_df['Side'] == 'S') & (csv_df['Symb'] == ticker)].values.tolist()
-
-
         # Get fundamental data
         float = gspread_all_values_dict[idx]['Float']
         mkt_cap = gspread_all_values_dict[idx]['Market Cap']
@@ -133,10 +128,10 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
 
         curr_date_trade_date_delta = datetime.today().date() - gspread_trade_date.date()
         # want to fundamental info somewhat accurate so don't record it if 5 days have passed
-        if curr_date_trade_date_delta < timedelta(days=5) and (float == '' or mkt_cap == '' or sector == '' or industry == '' or exchange == ''):
+        if curr_date_trade_date_delta < timedelta(days=5) and (
+                float == '' or mkt_cap == '' or sector == '' or industry == '' or exchange == ''):
             fundamentals_dict = util.grab_finviz_fundamentals(gspread_entries['Ticker'])
             update_fundamentals = True
-
 
         # update fundamentals if need be regardless of appropriate hloc recording
         if update_fundamentals:
@@ -145,16 +140,6 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
             gspread_all_values_dict[idx]['Sector'] = fundamentals_dict['Sector']
             gspread_all_values_dict[idx]['Industry'] = fundamentals_dict['Industry']
             gspread_all_values_dict[idx]['Exchange'] = fundamentals_dict['Exchange']
-
-        # Grab ticker and ticker's side from spreadsheet
-        if gspread_all_values_dict[idx]['Side'] == "":
-            if broker == 'cobra':
-                gspread_all_values_dict[idx]['Side'] = 'SS'
-            elif broker == 'etrade':
-                gspread_all_values_dict[idx]['Side'] = 'B'
-            else:
-                print("Broker unknown. Skipping trade")
-                continue
 
         ticker_entry_shares = gspread_all_values_dict[idx]['Entry Shares']
         ticker_avg_entry_price = gspread_all_values_dict[idx]['Avg Entry Price']
@@ -171,6 +156,49 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         if csv_df_share_sum.get(ticker) is None or \
                 ((gspread_trade_date != csv_file_date) and not ticker_entry_shares):
             continue
+
+        # Grab ticker and ticker's side from spreadsheet
+        if gspread_all_values_dict[idx]['Side'] == "":
+            if broker == 'cobra':
+                gspread_all_values_dict[idx]['Side'] = 'SS'
+            elif broker == 'etrade':
+                gspread_all_values_dict[idx]['Side'] = 'B'
+            else:
+                print("Broker unknown. Skipping trade")
+                continue
+
+        buys = csv_df.loc[(csv_df['Side'] == 'B') & (csv_df['Symb'] == ticker)].values.tolist()
+        sells = csv_df.loc[
+            ((csv_df['Side'] == 'S') | (csv_df['Side'] == 'SS')) & (csv_df['Symb'] == ticker)].values.tolist()
+
+        # update buys and sells list to be universally indexed between brokers
+        if broker == 'cobra':
+            for i, x in enumerate(buys):
+                buys[i] = {'date': csv_file_date.strftime("%m/%d/%y"),
+                           'time': x[0][:-3], # don't include seconds
+                           'price': x[3]
+                           }
+                gspread_entries['Buys'] = gspread_entries['Buys'] + ',' + str(buys[i])
+
+            for i, x in enumerate(sells):
+                sells[i] = {'date': csv_file_date.strftime("%m/%d/%y"),
+                            'time': x[0][:-3], # don't include seconds
+                            'price': x[3]
+                            }
+                gspread_entries['Sells'] = gspread_entries['Sells'] + ',' + str(sells[i])
+        if broker == 'etrade':
+            for i, x in enumerate(buys):
+                buys[i] = {'date': x[0],
+                           'time': x[1],
+                           'price': x[5]
+                           }
+                gspread_entries['Buys'] = gspread_entries['Buys'] + ',' + str(buys[i])
+            for i, x in enumerate(sells):
+                sells[i] = {'date': x[0],
+                            'time': x[1],
+                            'price': x[5]
+                            }
+                gspread_entries['Sells'] = gspread_entries['Sells'] + ',' + str(sells[i])
 
         for val in csv_df_share_sum[ticker].items():
             if val[0] == gspread_all_values_dict[idx]['Side']:
@@ -227,32 +255,36 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                 ticker_last_exit_datetime = datetime.combine(csv_file_date, last_exit_time.time())
 
                 # TODO: grab float info
-                #float_sector_info_dict = util.get_float_sector_info(ticker)
+                # float_sector_info_dict = util.get_float_sector_info(ticker)
 
                 ## I'm rounding the market cap with the afternoon high for now
-                #if float_sector_info_dict['shares outstanding'] != 'N/A':
+                # if float_sector_info_dict['shares outstanding'] != 'N/A':
                 #    data_dict['mktCap'] = data_dict['afternoon_high'] * float_sector_info_dict['shares outstanding']
-                #else:
+                # else:
                 #    data_dict['mktCap'] = 'N/A'
-                #data_dict['float'] = float_sector_info_dict['float']
-                #data_dict['short interest'] = float_sector_info_dict['short interest']
-                #data_dict['sector'] = float_sector_info_dict['sector']
-                #data_dict['industry'] = float_sector_info_dict['industry']
+                # data_dict['float'] = float_sector_info_dict['float']
+                # data_dict['short interest'] = float_sector_info_dict['short interest']
+                # data_dict['sector'] = float_sector_info_dict['sector']
+                # data_dict['industry'] = float_sector_info_dict['industry']
 
-                #data_dict['google_chart_link'] = gfile.get('alternateLink')
-
+                # data_dict['google_chart_link'] = gfile.get('alternateLink')
 
         worksheet_test = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'], 'ttest')
-        graph_link = graph_stock(ticker, gspread_trade_date, gspread_trade_date, strategy, buys, sells,
-                    risk=gspread_entries['Risk Price'], avg_entry=ticker_avg_entry_price,
-                    avg_exit=ticker_avg_exit_price, entry_time=ticker_first_entry_datetime,
-                    exit_time=ticker_last_exit_datetime, trade_side=gspread_all_values_dict[idx]['Side'],
-                    right=gspread_entries['Right'], wrong=gspread_entries['Wrong'], cont=gspread_entries['Continue'])
+        graph_link = [""]
+        # if ticker_avg_exit_price != "": # just graph the stock if the trade is finished
+        graph_link = graph_stock(ticker, gspread_trade_date, csv_file_date, strategy, buys, sells,
+                                 risk=gspread_entries['Risk Price'], avg_entry=ticker_avg_entry_price,
+                                 avg_exit=ticker_avg_exit_price, entry_time=ticker_first_entry_datetime,
+                                 exit_time=ticker_last_exit_datetime, trade_side=gspread_all_values_dict[idx]['Side'],
+                                 right=gspread_entries['Right'], wrong=gspread_entries['Wrong'],
+                                 cont=gspread_entries['Continue'])
 
         # Place average entry and exit, entry and exit shares, and times back in gspread_all_values_dict at the current idx
         gspread_all_values_dict[idx]['Entry Shares'] = ticker_entry_shares
         gspread_all_values_dict[idx]['Avg Entry Price'] = ticker_avg_entry_price
         gspread_all_values_dict[idx]['Exit Shares'] = ticker_exit_shares
+        gspread_all_values_dict[idx]['Buys'] = str(buys)
+        gspread_all_values_dict[idx]['Sells'] = str(sells)
         gspread_all_values_dict[idx]['Avg Exit Price'] = ticker_avg_exit_price
         gspread_all_values_dict[idx]['First Entry Time'] = str(ticker_first_entry_datetime)
         gspread_all_values_dict[idx]['Last Entry Time'] = str(ticker_last_entry_datetime)
@@ -272,11 +304,13 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
 # publish updated worksheet
 gspread_df = pd.DataFrame(gspread_all_values_dict)
 # remove columns that have google sheets formulas so we don't overwrite them
-#gspread_df = gspread_df.loc[:, :gspread_first_hloc_column]
+# gspread_df = gspread_df.loc[:, :gspread_first_hloc_column]
 # select column range to write to
-gspread_df = gspread_df.loc[:,gspread_first_auto_entry_column: gspread_first_hloc_column]
+gspread_df = gspread_df.loc[:, gspread_first_auto_entry_column: gspread_first_hloc_column]
 gspread_first_auto_entry_column_idx = worksheet.find(gspread_first_auto_entry_column)
 gspread_last_raw_value_column_idx = worksheet.find(gspread_first_hloc_column)
-#worksheet.update([gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
-worksheet.update(gspread_first_auto_entry_column_idx.address + ':' + gspread_last_raw_value_column_idx.address[0:-1]+str(len(gspread_all_values_dict)+1),
-                      [gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
+# worksheet.update([gspread_df.columns.values.tolist()] + gspread_df.values.tolist())
+worksheet.update(
+    gspread_first_auto_entry_column_idx.address + ':' + gspread_last_raw_value_column_idx.address[0:-1] + str(
+        len(gspread_all_values_dict) + 1),
+    [gspread_df.columns.values.tolist()] + gspread_df.values.tolist())

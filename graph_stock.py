@@ -29,10 +29,13 @@ def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None, risk=Non
                   right=None, wrong=None, cont=None):
 
     gain_perc = None
-    if trade_side == 'B':
-        gain_perc = (avg_exit - avg_entry) / avg_entry
-    elif trade_side == 'SS':
-        gain_perc = (avg_entry - avg_exit) / avg_entry
+    if avg_exit is not None and avg_exit != "":
+        if trade_side == 'B':
+            gain_perc = (avg_exit - avg_entry) / avg_entry
+        elif trade_side == 'SS':
+            gain_perc = (avg_entry - avg_exit) / avg_entry
+
+        gain_perc = round(gain_perc * 100, 2)
 
     stock_df = frame.copy()
     stock_df['datetime'] = stock_df.t.apply(lambda x: datetime.datetime.fromtimestamp(x / 1000).astimezone(pytz.timezone('UTC')))
@@ -65,18 +68,18 @@ def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None, risk=Non
 
     if buys != None:
             for i in buys:
-                dt_str = i[0] + ' ' + i[1]
+                dt_str = i['date'] + ' ' + i['time']
                 dt = datetime.datetime.strptime(dt_str, "%m/%d/%y %H:%M")
                 fig.add_trace(
-                    go.Scatter(x=[dt], y=[i[5]], showlegend=False,
+                    go.Scatter(x=[dt], y=[i['price']], showlegend=False,
                                marker=go.scatter.Marker(size=8, symbol=['triangle-up'], color='#74F478')),
                     secondary_y=True)
     if sells != None:
         for i in sells:
-            dt_str = i[0] + ' ' + i[1]
+            dt_str = i['date'] + ' ' + i['time']
             dt = datetime.datetime.strptime(dt_str, "%m/%d/%y %H:%M")
             fig.add_trace(
-                go.Scatter(x=[dt], y=[i[5]], showlegend=False,
+                go.Scatter(x=[dt], y=[i['price']], showlegend=False,
                            marker=go.scatter.Marker(size=8, symbol=['triangle-down'], color='#951D0F')),
                 secondary_y=True)
 
@@ -128,7 +131,7 @@ def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None, risk=Non
                                 x=-0.15,
                                 y=-0.16,
                                 showarrow=False,
-                                text='Gain%: ' + str(round(gain_perc*100,2)),
+                                text='Gain%: ' + str(gain_perc),
                                 textangle=0,
                                 xanchor='left',
                                 xref="paper",
