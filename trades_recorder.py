@@ -167,38 +167,42 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
                 print("Broker unknown. Skipping trade")
                 continue
 
-        buys = csv_df.loc[(csv_df['Side'] == 'B') & (csv_df['Symb'] == ticker)].values.tolist()
-        sells = csv_df.loc[
+        csv_file_buys = csv_df.loc[(csv_df['Side'] == 'B') & (csv_df['Symb'] == ticker)].values.tolist()
+        csv_file_sells = csv_df.loc[
             ((csv_df['Side'] == 'S') | (csv_df['Side'] == 'SS')) & (csv_df['Symb'] == ticker)].values.tolist()
 
         # update buys and sells list to be universally indexed between brokers
+        parsed_buys = []
+        parsed_sells = []
         if broker == 'cobra':
-            for i, x in enumerate(buys):
-                buys[i] = {'date': csv_file_date.strftime("%m/%d/%y"),
-                           'time': x[0][:-3], # don't include seconds
-                           'price': x[3]
-                           }
-                gspread_entries['Buys'] = gspread_entries['Buys'] + ',' + str(buys[i])
+            for i, x in enumerate(csv_file_buys):
+                parsed_buys.append({'date': csv_file_date.strftime("%m/%d/%y"),
+                                    'time': x[0][:-3], # don't include seconds
+                                    'price': x[3]
+                                    })
 
-            for i, x in enumerate(sells):
-                sells[i] = {'date': csv_file_date.strftime("%m/%d/%y"),
-                            'time': x[0][:-3], # don't include seconds
-                            'price': x[3]
-                            }
-                gspread_entries['Sells'] = gspread_entries['Sells'] + ',' + str(sells[i])
+            for i, x in enumerate(csv_file_sells):
+                parsed_sells.append({'date': csv_file_date.strftime("%m/%d/%y"),
+                                    'time': x[0][:-3], # don't include seconds
+                                    'price': x[3]
+                                    })
         if broker == 'etrade':
-            for i, x in enumerate(buys):
-                buys[i] = {'date': x[0],
-                           'time': x[1],
-                           'price': x[5]
-                           }
-                gspread_entries['Buys'] = gspread_entries['Buys'] + ',' + str(buys[i])
-            for i, x in enumerate(sells):
-                sells[i] = {'date': x[0],
-                            'time': x[1],
-                            'price': x[5]
-                            }
-                gspread_entries['Sells'] = gspread_entries['Sells'] + ',' + str(sells[i])
+            for i, x in enumerate(csv_file_buys):
+                parsed_buys.append({'date': x[0],
+                                    'time': x[1],
+                                    'price': x[5]
+                                    })
+            for i, x in enumerate(csv_file_sells):
+                parsed_sells.append({'date': x[0],
+                                    'time': x[1],
+                                    'price': x[5]
+                                    })
+
+        # Avoid duplicate entries and exits
+        if str(parsed_buys) not in gspread_entries['Buys'] and gspread_entries['Buys'] != "":
+            parsed_buys.insert(0, eval(gspread_entries['Buys'])[0])
+        if str(parsed_sells) not in gspread_entries['Sells'] and gspread_entries['Sells'] != "":
+            parsed_sells.insert(0, eval(gspread_entries['Sells'])[0])
 
         for val in csv_df_share_sum[ticker].items():
             if val[0] == gspread_all_values_dict[idx]['Side']:
@@ -272,7 +276,7 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         worksheet_test = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'], 'ttest')
         graph_link = [""]
         # if ticker_avg_exit_price != "": # just graph the stock if the trade is finished
-        graph_link = graph_stock(ticker, gspread_trade_date, csv_file_date, strategy, buys, sells,
+        graph_link = graph_stock(ticker, gspread_trade_date, csv_file_date, strategy, parsed_buys, parsed_sells,
                                  risk=gspread_entries['Risk Price'], avg_entry=ticker_avg_entry_price,
                                  avg_exit=ticker_avg_exit_price, entry_time=ticker_first_entry_datetime,
                                  exit_time=ticker_last_exit_datetime, trade_side=gspread_all_values_dict[idx]['Side'],
@@ -283,8 +287,8 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
         gspread_all_values_dict[idx]['Entry Shares'] = ticker_entry_shares
         gspread_all_values_dict[idx]['Avg Entry Price'] = ticker_avg_entry_price
         gspread_all_values_dict[idx]['Exit Shares'] = ticker_exit_shares
-        gspread_all_values_dict[idx]['Buys'] = str(buys)
-        gspread_all_values_dict[idx]['Sells'] = str(sells)
+        gspread_all_values_dict[idx]['Buys'] = str(parsed_buys)
+        gspread_all_values_dict[idx]['Sells'] = str(parsed_sells)
         gspread_all_values_dict[idx]['Avg Exit Price'] = ticker_avg_exit_price
         gspread_all_values_dict[idx]['First Entry Time'] = str(ticker_first_entry_datetime)
         gspread_all_values_dict[idx]['Last Entry Time'] = str(ticker_last_entry_datetime)
