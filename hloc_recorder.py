@@ -67,9 +67,9 @@ for idx, gspread_entries in enumerate(gspread_all_values_dict):
             dbg_print("Wait until market close to grab HLOC information for ticker " + gspread_entries["Ticker"])
             continue
 
-    # Need to subscribe to options before hloc can be gathered
-    if 'chuck hughes' in gspread_entries['Strategy']:
-        continue
+        # Need to subscribe to options before hloc can be gathered
+        if 'chuck hughes' in gspread_entries['Strategy']:
+            continue
 
         # Grab hloc info
         hloc_dict = hloc_utilities.get_intraday_data(gspread_entries['Ticker'], gspread_trade_dt, gspread_entries['Strategy'])
