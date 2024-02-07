@@ -18,5 +18,6 @@ folder_ids = {
     'rob booker long': '1Ld9lWavNDDCwsHR6U5RPphjpjK-xDwEg',
     'open spike to vwap short': '1qNIXtdzrt_t2XUEEz7mdygZqige1kFFt',
     'max red candle short': '1ffvqtEhZezhvCT0Bh54kcLC5a8ikVIyq',
+    'formula h short': '1k6Z-lcJJQ_5EE9m-VeG2Ne6XtFi4-lKu',
     'test': '1bgSnCTMYrw4bjZkSrem4cZOU246BTDFe',
 }
