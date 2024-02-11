@@ -24,6 +24,8 @@ import util
 config_object = ConfigParser()
 config_object.read("config/config.ini")
 
+IMAGE_PATH = 'graphs/'
+
 
 def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None, risk=None, avg_entry=None, avg_exit=None,
                   entry_time=None, exit_time=None, trade_side=None,
@@ -226,16 +228,15 @@ def plot_intraday(frame, ticker, date, buys, sells, strategy_name=None, risk=Non
         legend=dict(font=dict(size=25)),
     )
 
-    fig.show()
+    #fig.show() # for debugging only
     if strategy_name is not None:
         image_name = ticker + '_' + strategy_name + "_" + date.strftime("%Y-%m-%d") + '_' + 'intraday' + '.png'
     else:
         image_name = ticker + "_" + date.strftime("%Y-%m-%d") + '_' + 'intraday' + '.png'
 
-    image_path = 'graphs/' + image_name
     # fig.write_image(image_path, format='png', scale=15)
-    fig.write_image(image_path, format='png', height=2000, width=4000, scale=2)
-    return image_path
+    fig.write_image(IMAGE_PATH+image_name, format='png', height=2000, width=4000, scale=2)
+    return image_name
 
 
 def plot_daily(frame, ticker, date, strategy_name=None):
@@ -298,16 +299,14 @@ def plot_daily(frame, ticker, date, strategy_name=None):
         xaxis2=dict(tickfont=dict(size=30)),
     )
 
-    # fig.show()
+    # fig.show() # for debugging only
     if strategy_name is not None:
         image_name = ticker + '_' + strategy_name + "_" + date.strftime("%Y-%m-%d") + '_' + 'daily' + '.png'
     else:
         image_name = ticker + "_" + date.strftime("%Y-%m-%d") + '_' + 'daily' + '.png'
 
-    image_path = 'graphs/' + image_name
-
-    fig.write_image(image_path, format='png', height=2000, width=4000, scale=2)
-    return image_path
+    fig.write_image(IMAGE_PATH+image_name, format='png', height=2000, width=4000, scale=2)
+    return image_name
 
 
 def graph_stock(ticker, start_date, end_date, strategy, buys=None, sells=None, risk=None,
@@ -322,49 +321,29 @@ def graph_stock(ticker, start_date, end_date, strategy, buys=None, sells=None, r
                                    risk=risk, right=right, wrong=wrong, cont=cont)
     daily_image = plot_daily(daily_frame, ticker, start_date, strategy_name=strategy)
 
-    image_list = [daily_image, intraday_image]
-    images = [Image.open(x) for x in image_list]
-    widths, heights = zip(*(i.size for i in images))
+    image_list = [intraday_image,daily_image]
 
-    total_width = sum(widths)
-    max_height = max(heights)
-
-    new_im = Image.new('RGB', (total_width, max_height))
-
-    x_offset = 0
-    for im in images:
-        new_im.paste(im, (x_offset, 0))
-        x_offset += im.size[0]
 
     if isinstance(start_date, datetime.datetime):
         start_date = start_date.strftime("%Y-%m-%d")
     if isinstance(end_date, datetime.datetime):
         end_date = end_date.strftime("%Y-%m-%d")
 
-    image_name = ticker + '_' + start_date + '_' + end_date + '.png'
-    new_im.save('graphs/' + image_name)
-
     # only upload files that don't exist
     folder_str = "'{}' in parents and trashed=false".format(folder_ids[strategy])
     file_list = drive.ListFile({'q': folder_str}).GetList()
-    file_exists = False
-    os.chdir('graphs/')
+    os.chdir(IMAGE_PATH)
     for file in file_list:
-        if file['title'] == image_name:
-            file_exists = True
-            gfile = drive.CreateFile({'parents': [{'id': folder_ids[strategy]}], 'id': file['id']})
-            gfile.FetchContent()
-            break
+        for img in image_list:
+            if file['title'] == img:
+                file.Trash()
 
-    # If file exist, move to trash and upload new one.
-    if file_exists:
-        file.Trash()
-
-    gfile = drive.CreateFile({'parents': [{'id': folder_ids[strategy]}]})
-    gfile.SetContentFile(image_name)
-    gfile.Upload()  # Upload the file.
-
+    for img in image_list:
+        gfile = drive.CreateFile({'parents': [{'id': folder_ids[strategy]}]})
+        gfile.SetContentFile(img)
+        gfile.Upload()  # Upload the file.
     os.chdir('../')
+
 
     result = [gfile.get('alternateLink')]
 
@@ -374,6 +353,5 @@ def graph_stock(ticker, start_date, end_date, strategy, buys=None, sells=None, r
 
 
 worksheet_test = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'], 'ttest')
-# graph_stock('ENSC', '2024-1-31', '2024-1-31', 'test', sells=None, buys=None)
-graph_stock('ENSC', datetime.datetime(year=2024, month=1, day=31), datetime.datetime(year=2024, month=1, day=31),
-            'test', sells=None, buys=None)
+#graph_stock('ENSC', datetime.datetime(year=2024, month=1, day=31), datetime.datetime(year=2024, month=1, day=31),
+#            'test', sells=None, buys=None)
