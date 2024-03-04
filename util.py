@@ -131,8 +131,8 @@ def convert24(str1):
         # add 12 to hours and remove PM
         return str(int(str1[:2]) + 12) + str1[2:5]
 
-def grab_finviz_fundamentals(ticker):
 
+def grab_finviz_fundamentals(ticker):
     stock_dict = dict()
 
     stock_dict['Float'] = 'na'
@@ -145,10 +145,10 @@ def grab_finviz_fundamentals(ticker):
         stock = finvizfinance(ticker)
     except:
         print("error grabbing data for ticker: " + ticker)
-        return
+        return stock_dict
 
+    dbg_print('grab fundamentals for ' + ticker)
     fundamentals = stock.ticker_fundament()
-
 
     stock_dict['Float'] = convert_stock_info_string_to_float(fundamentals['Shs Float'])
     stock_dict['Market Cap'] = convert_stock_info_string_to_float(fundamentals['Market Cap'])
@@ -158,30 +158,31 @@ def grab_finviz_fundamentals(ticker):
 
     return stock_dict
 
+
 def convert_stock_info_string_to_float(info):
     """
     :type info: 'xxxM' or 'xxxB' (M: 1 Million and B: 1 Billion)
     """
     if info[-1] == 'M':
-        info = float(info[0:-1])*1000000
+        info = float(info[0:-1]) * 1000000
         return info
     elif info[-1] == 'B':
-        info = float(info[0:-1])*1000000000
+        info = float(info[0:-1]) * 1000000000
         return info
     else:
         print('float data has suffix other than M or B.')
 
-def get_ticker_list():
 
+def get_ticker_list():
     tickers = cast(
         HTTPResponse,
         polygon_client.get_snapshot_all(market_type='stocks', include_otc=True, raw=True),
     )
 
-
     ddict = json.loads(tickers.data.decode("utf-8"))
     tickers_df = pd.DataFrame(ddict['tickers'])
 
     return tickers_df['ticker'].sort_values().tolist()
+
 
 get_ticker_list()

@@ -19,5 +19,10 @@ folder_ids = {
     'open spike to vwap short': '1qNIXtdzrt_t2XUEEz7mdygZqige1kFFt',
     'max red candle short': '1ffvqtEhZezhvCT0Bh54kcLC5a8ikVIyq',
     'formula h short': '1k6Z-lcJJQ_5EE9m-VeG2Ne6XtFi4-lKu',
-    'test': '1bgSnCTMYrw4bjZkSrem4cZOU246BTDFe',
+    'pm short': '1M1uX6JIw5zXd8dqZ1aZ6_PNH4ZvHe4Ud',
+    'resistance short': '1fBNBye21Zv6Gm-BbD_Rh54PoflR_bY-v',
+    'experimental': '1IX1OLC3BooWzA8cSG-7D-MvLWCxT60lo',
+    'test': '1aHcEhroaMRGCnmT_q813dba6BH296jDa',
+    'afterhours short':'1VUd0UhqXOzJaNhOvIuxeau_Emfg84Og-',
+    'down trend': '1CyxAP9gYRpSroTvSDnahWqum50zPu6pE',
 }

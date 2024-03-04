@@ -13,12 +13,13 @@ gspread_worksheet = sys.argv[1]
 config_object = ConfigParser()
 config_object.read("config/config.ini")
 
-gspread_first_auto_entry_column = 'Chart'
 gspread_last_auto_entry_column = 'Aft Low Time'
 
 if 'trades' == gspread_worksheet:
+    gspread_first_auto_entry_column = 'Float'
     worksheet = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'],config_object['main']['GSPREAD_TRADES_WORKSHEET'])
 elif 'missed_ops' == gspread_worksheet:
+    gspread_first_auto_entry_column = 'Chart'
     worksheet = util.get_gspread_worksheet(config_object['main']['GSPREAD_SPREADSHEET'],config_object['main']['GSPREAD_MISSED_OPPORTUNITIES_WORKSHEET'])
 else:
     print('incorrect worksheet. Exiting program')
