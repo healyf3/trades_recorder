@@ -99,6 +99,10 @@ def trades_csv_to_df(trades_file):
 
     elif broker == 'cobra':
         csv_df = pd.read_csv(trades_file)
+        options_symbols = csv_df[csv_df.Symb.str.contains("\+")]
+        for row in options_symbols.iterrows():
+            options_symbol = csv_df.Symb[row[0]]
+            csv_df.Symb[row[0]] = options_symbol[1:options_symbol.index("^")]
     else:
         print("wrong csv file name format")
         sys.exit()
