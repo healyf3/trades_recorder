@@ -30,7 +30,7 @@ config_object.read("config/config.ini")
 IMAGE_PATH = 'graphs/'
 
 def insert_break_after_40(text):
-    if len(text) <= 120:
+    if text is None or len(text) <= 120:
         return text
     # If the text is longer, find the first space after the 40th character
     else:
@@ -51,7 +51,7 @@ def plot_intraday(frame, ticker, date, buys, sells, share_size=None, strategy_na
     #wrong = "Wrong: " + wrong + '<br>'
     #cont = "Continue: " + cont + '<br>'
     #notes = "Notes: " + notes + '<br>'
-    retrospect = right + wrong + cont + notes
+    retrospect = str(right) + str(wrong) + str(cont) + str(notes)
 
     gain_perc = None
     if avg_exit is not None and avg_exit != "":
@@ -374,28 +374,39 @@ def graph_stock(ticker, start_date, end_date, strategy, share_size=None, buys=No
     leap_year_subtract_day = 0
     if end_date.month == 2 and end_date.day == 29:
         leap_year_subtract_day = 1
-    # grab end date ticks for daily ticks to see the whole picture of the trade
-    if strategy in swing_strategies_list:
-        days = 60 + leap_year_subtract_day
-        daily_frame = hloc_utilities.get_daily_ticks(ticker, end_date, days=days)  # grab previous 60 days
-    else:  # for day trading strategies, grab intraday data
-        intraday_frame = hloc_utilities.get_intraday_ticks(ticker, start_date, end_date)
-        daily_frame = hloc_utilities.get_daily_ticks(ticker, end_date, years=3, days=leap_year_subtract_day)  # grab previous 3 years
 
-        intraday_image = plot_intraday(intraday_frame, ticker, start_date, buys, sells, share_size, strategy_name=strategy,
+    end_date_dt = 0
+    start_date_dt = 0
+    if type(end_date) is datetime.datetime:
+        end_date_dt = end_date
+    else:
+        end_date_dt = datetime.datetime.strptime(end_date, '%Y-%m-%d')
+
+    if type(start_date) is datetime.datetime:
+        start_date_dt = start_date
+    else:
+        start_date_dt = datetime.datetime.strptime(start_date, '%Y-%m-%d')
+
+    # grab end date ticks for daily ticks to see the whole picture of the trade
+    daily_start_date_dt = datetime.datetime(year=end_date_dt.year - 3, month=end_date_dt.month,
+                                            day=end_date_dt.day - leap_year_subtract_day)
+
+    if strategy in swing_strategies_list:
+        daily_start_date_dt = daily_start_date_dt - datetime.timedelta(days=60)
+        daily_frame = hloc_utilities.get_daily_ticks(ticker, daily_start_date_dt, end_date)  # grab previous 60 days
+    else:  # for day trading strategies, grab intraday data
+        intraday_frame = hloc_utilities.get_intraday_ticks(ticker, start_date_dt, end_date)
+        daily_frame = hloc_utilities.get_daily_ticks(ticker, daily_start_date_dt, end_date)  # grab previous 3 years
+
+        intraday_image = plot_intraday(intraday_frame, ticker, start_date_dt, buys, sells, share_size, strategy_name=strategy,
                                        avg_entry=avg_entry, avg_exit=avg_exit, entry_time=entry_time,
                                        exit_time=exit_time,
                                        trade_side=trade_side,
                                        risk=risk, right=right, wrong=wrong, cont=cont, notes=notes)
         image_list.append(intraday_image)
 
-    daily_image = plot_daily(daily_frame, ticker, start_date, share_size, strategy_name=strategy)
+    daily_image = plot_daily(daily_frame, ticker, start_date_dt, share_size, strategy_name=strategy)
     image_list.append(daily_image)
-
-    if isinstance(start_date, datetime.datetime):
-        start_date = start_date.strftime("%Y-%m-%d")
-    if isinstance(end_date, datetime.datetime):
-        end_date = end_date.strftime("%Y-%m-%d")
 
     # only upload files that don't exist
     folder_str = "'{}' in parents and trashed=false".format(folder_ids[strategy])

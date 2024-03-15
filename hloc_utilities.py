@@ -13,17 +13,16 @@ import util
 from util import polygon_client
 
 
-def get_daily_ticks(ticker, end_date, years=0, days=0):
-    if type(end_date) is datetime.datetime:
-        end_date_dt = end_date
-    else:
-        end_date_dt = datetime.datetime.strptime(end_date, '%Y-%m-%d')
+def get_daily_ticks(ticker, start_date, end_date, years=0, days=0):
 
-    start_date_dt = datetime.datetime(year=end_date_dt.year-years, month=end_date_dt.month, day=end_date_dt.day-days)
+    if not isinstance(start_date, datetime.datetime):
+        start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    if not isinstance(end_date, datetime.datetime):
+        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
 
     aggs = cast(
         HTTPResponse,
-        polygon_client.get_aggs(ticker, 1, "day", start_date_dt, end_date_dt, raw=True),
+        polygon_client.get_aggs(ticker, 1, "day", start_date, end_date, raw=True),
     )
 
     ddict = json.loads(aggs.data.decode("utf-8"))
