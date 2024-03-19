@@ -26,5 +26,6 @@ folder_ids = {
     'afterhours short':'1VUd0UhqXOzJaNhOvIuxeau_Emfg84Og-',
     'down trend': '1CyxAP9gYRpSroTvSDnahWqum50zPu6pE',
     'midday squeeze': '1t0t2ngp0hIvRrlRTEJSAmeqs3mHhAke4',
-    'chuck hughes signal': '1zr78p0Owi7kdd7WUf41tTqeW4jaFP530'
+    'chuck hughes signal': '1zr78p0Owi7kdd7WUf41tTqeW4jaFP530',
+    'md bo': '1bnDq6B8dttzuOGYksTNAurg3LaDb5C4g'
 }
